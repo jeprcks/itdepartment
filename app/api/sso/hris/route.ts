@@ -1,0 +1,57 @@
+import { consumeHrisToken, readHandshakeConfig, safeNextPath } from "../../../../lib/sso/handshake.ts";
+
+export async function POST(request: Request) {
+  const config = readHandshakeConfig();
+  if (!config) {
+    return Response.json({ error: "Authentication failed" }, { status: 401 });
+  }
+
+  let token = "";
+  let next = "";
+  const contentType = request.headers.get("content-type") ?? "";
+  if (contentType.includes("application/json")) {
+    const body = (await request.json().catch(() => null)) as { token?: unknown; next?: unknown } | null;
+    token = typeof body?.token === "string" ? body.token : "";
+    next = typeof body?.next === "string" ? body.next : "";
+  } else {
+    const form = await request.formData().catch(() => null);
+    token = String(form?.get("token") ?? "");
+    next = String(form?.get("next") ?? "");
+  }
+
+  const result = await consumeHrisToken(token, config);
+  if (!result.ok) {
+    console.info("hris sso rejected", { reason: result.reason });
+    return Response.json({ error: "Authentication failed" }, { status: 401 });
+  }
+
+  const destination = safeNextPath(next, config.allowedPaths);
+  return new Response(null, {
+    status: 303,
+    headers: {
+      Location: destination,
+      "Set-Cookie": serializeCookie(result.cookie),
+      "Cache-Control": "no-store",
+    },
+  });
+}
+
+function serializeCookie(cookie: {
+  name: string;
+  value: string;
+  httpOnly: boolean;
+  secure: boolean;
+  sameSite: "lax";
+  path: string;
+  maxAge: number;
+}) {
+  const parts = [
+    `${cookie.name}=${cookie.value}`,
+    `Max-Age=${cookie.maxAge}`,
+    `Path=${cookie.path}`,
+    "HttpOnly",
+    "SameSite=Lax",
+  ];
+  if (cookie.secure) parts.push("Secure");
+  return parts.join("; ");
+}
