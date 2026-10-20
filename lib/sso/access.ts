@@ -17,12 +17,14 @@ function list(raw: string | undefined, fallback: string) {
 }
 
 /**
- * Maps HRMS identity to an itdepartment access level, or null (denied).
- * - HRMS role super_admin            -> super_admin (everything)
- * - HRMS role president, or position title in PRESIDENT list -> president (CRUD on all)
- * - department code/name in IT list  -> it_staff (CRUD on own projects only)
+ * Maps HRMS identity to an itdepartment access level.
+ * HRMS decides who may launch (IT dept, President, super_admin), so every
+ * authenticated user gets in:
+ * - HRMS role super_admin                         -> super_admin (everything)
+ * - HRMS role president, or position in PRESIDENT -> president (CRUD on all)
+ * - anyone else                                   -> it_staff (own projects only)
  */
-export function resolveAccess(input: AccessInput, env: Env = process.env): AccessLevel | null {
+export function resolveAccess(input: AccessInput, env: Env = process.env): AccessLevel {
   const role = input.accountType.trim().toLowerCase();
   if (role === "super_admin") return "super_admin";
   if (role === "president") return "president";
@@ -31,15 +33,7 @@ export function resolveAccess(input: AccessInput, env: Env = process.env): Acces
   if (position !== "" && list(env.IT_PM_PRESIDENT_POSITIONS, "President").includes(position)) {
     return "president";
   }
-
-  const codes = list(env.IT_PM_IT_DEPARTMENT_CODES, "IT");
-  const names = list(env.IT_PM_IT_DEPARTMENT_NAMES, "IT Department,Information Technology");
-  const code = input.departmentCode.trim().toLowerCase();
-  const name = input.departmentName.trim().toLowerCase();
-  if ((code !== "" && codes.includes(code)) || (name !== "" && names.includes(name))) {
-    return "it_staff";
-  }
-  return null;
+  return "it_staff";
 }
 
 export type ProjectOwnership = {
@@ -49,6 +43,19 @@ export type ProjectOwnership = {
 
 export function canManageAll(access: AccessLevel) {
   return access === "super_admin" || access === "president";
+}
+
+/** President, super admin, and department head notes are announced. */
+export function canAnnounceNotes(
+  viewer: { access: AccessLevel; position: string },
+  env: Env = process.env,
+) {
+  if (canManageAll(viewer.access)) return true;
+  const position = viewer.position.trim().toLowerCase();
+  if (position === "") return false;
+  return list(env.IT_PM_DEPARTMENT_HEAD_POSITIONS, "department head,dept head,head").includes(
+    position,
+  );
 }
 
 /** it_staff may only change projects they own or are assigned to. */

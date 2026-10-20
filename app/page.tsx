@@ -4,7 +4,11 @@ import { requireSession } from "@/lib/sso/session.ts";
 
 async function Dashboard() {
   const session = await requireSession();
-  return <Homepage viewer={{ name: session.name, access: session.access }} />;
+  return (
+    <Homepage
+      viewer={{ name: session.name, access: session.access, position: session.position }}
+    />
+  );
 }
 
 export default function Home() {

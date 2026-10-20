@@ -1,7 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import {
   SESSION_COOKIE,
-  hrmsDashboardUrl,
   readSessionProfile,
   readSessionSecret,
 } from "./lib/sso/handshake.ts";
@@ -21,8 +20,7 @@ export function proxy(request: NextRequest) {
   if (pathname.startsWith("/api/")) {
     return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   }
-  const hrms = hrmsDashboardUrl();
-  const target = hrms !== "" ? hrms : new URL("/access-denied?reason=signin", request.url).toString();
+  const target = new URL("/access-denied?reason=signin", request.url);
   const response = NextResponse.redirect(target, 303);
   if (request.cookies.has(SESSION_COOKIE)) response.cookies.delete(SESSION_COOKIE);
   return response;

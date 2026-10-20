@@ -35,18 +35,6 @@ export async function POST(request: Request) {
   }
 
   const access = resolveAccess(result.claims);
-  if (!access) {
-    console.info("hris sso denied", { reason: "not-it-department", uid: result.claims.hrmsUserId });
-    return new Response(null, {
-      status: 303,
-      headers: {
-        Location: "/access-denied",
-        "Set-Cookie": `it_pm_session=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax`,
-        "Cache-Control": "no-store",
-      },
-    });
-  }
-
   const cookie = issueSessionCookie(
     sessionSecret,
     result.claims,

@@ -15,13 +15,17 @@ HRMS (Wise-HRMS) is the only identity provider. There is no local login and no l
 
 ## Access levels
 
+HRMS decides who can open the app: the "IT Department" nav link and the launch/consume endpoints only allow `super_admin`, the President (role `president` or position `President`) and employees whose department (employee department, else position department) is IT (code or name `IT`, `IT Department`, `Information Technology`). super_admin accounts without an employee number are sent as `ADMIN-<user id>`.
+
+itdepartment accepts every user HRMS authenticates:
+
 | Level | Who | Rights |
 | --- | --- | --- |
 | `super_admin` | HRMS role `super_admin` | everything |
-| `president` | HRMS role `president`, or position title in `IT_PM_PRESIDENT_POSITIONS` (default `President`) | CRUD on all projects |
-| `it_staff` | department code in `IT_PM_IT_DEPARTMENT_CODES` (default `IT`) or name in `IT_PM_IT_DEPARTMENT_NAMES` | CRUD only on projects they own or are assigned to |
-| denied | everyone else | `/access-denied` page with link back to HRMS |
+| `president` | HRMS role `president`, or position in `IT_PM_PRESIDENT_POSITIONS` (default `President`) | CRUD on all projects |
+| `it_staff` | everyone else HRMS lets through | CRUD only on projects they own or are assigned to |
 
+`IT_PM_IT_DEPARTMENT_CODES` / `IT_PM_IT_DEPARTMENT_NAMES` are no longer used. `/access-denied` is only shown as a sign-in fallback when `HRIS_DASHBOARD_URL` is not set.
 Projects are still client-side (localStorage/seed data). Ownership checks (`canEditProject`) currently run in the UI only; server-side enforcement needs a server project store (pending decision).
 
 ## Environment variables (set on the server, never commit values)

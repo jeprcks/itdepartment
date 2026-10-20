@@ -3,7 +3,6 @@ import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import {
   SESSION_COOKIE,
-  hrmsDashboardUrl,
   readSessionProfile,
   readSessionSecret,
   type SessionProfile,
@@ -19,6 +18,6 @@ export async function getSession(): Promise<SessionProfile | null> {
 /** Use in every page/server action as defence in depth (proxy also checks). */
 export async function requireSession(): Promise<SessionProfile> {
   const session = await getSession();
-  if (!session) redirect(hrmsDashboardUrl() || "/access-denied?reason=signin");
+  if (!session) redirect("/access-denied?reason=signin");
   return session;
 }

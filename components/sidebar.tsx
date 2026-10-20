@@ -16,43 +16,43 @@ export default async function Sidebar() {
     .filter(Boolean)
     .join(" \u00b7 ");
   return (
-    <aside className="sticky top-0 flex h-dvh w-[22.5rem] shrink-0 flex-col bg-[#193956] font-sans text-[#F5F7FA]">
-      <div className="flex items-center gap-3 px-4 py-5">
-        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-white text-sm font-extrabold tracking-tight text-[#1d4e89]">
+    <aside className="flex h-dvh w-56 shrink-0 flex-col bg-[#193956] font-sans text-[#F5F7FA]">
+      <div className="flex items-center gap-2 px-3 py-3">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white text-[10px] font-extrabold tracking-tight text-[#1d4e89]">
           WISE
         </div>
         <div className="min-w-0">
-          <p className="text-sm font-semibold leading-tight text-[#F5F7FA]">
+          <p className="text-xs font-semibold leading-tight text-[#F5F7FA]">
             WISE Immigration & Study Services
           </p>
-          <p className="mt-1 text-[11px] font-semibold leading-tight tracking-[0.06em] text-[#F0B429]">
-            IT DEPARTMENT PROJECT MANAGEMENT
+          <p className="mt-0.5 text-[10px] font-semibold leading-tight tracking-[0.04em] text-[#F0B429]">
+            IT PROJECT MANAGEMENT
           </p>
         </div>
       </div>
 
       <div className="border-t border-[rgba(255,255,255,0.12)]" />
 
-      <nav className="flex flex-col gap-1 px-3 py-4" aria-label="Main">
+      <nav className="flex flex-col gap-0.5 px-2 py-2" aria-label="Main">
         <Link
           href="/"
-          className="flex items-center gap-3 rounded-lg py-2.5 pr-3 pl-4 text-sm font-medium text-[#F5F7FA] transition-colors hover:bg-[#446586]"
+          className="flex items-center gap-2 rounded-lg py-2 pr-2 pl-3 text-sm font-medium text-[#F5F7FA] transition-colors hover:bg-[#446586]"
         >
           Dashboard
         </Link>
         <Link
-          href="/history"
-          className="flex items-center gap-3 rounded-lg py-2.5 pr-3 pl-4 text-sm font-medium text-[#F5F7FA] transition-colors hover:bg-[#446586]"
+          href="/logs"
+          className="flex items-center gap-2 rounded-lg py-2 pr-2 pl-3 text-sm font-medium text-[#F5F7FA] transition-colors hover:bg-[#446586]"
         >
-          History
+          Logs
         </Link>
       </nav>
 
-      <div className="mt-auto border-t border-[rgba(255,255,255,0.12)] px-4 py-4">
+      <div className="mt-auto border-t border-[rgba(255,255,255,0.12)] px-3 py-3">
         {hrms ? (
           <a
             href={hrms}
-            className="mb-4 flex items-center justify-center gap-2 rounded-lg border border-[rgba(255,255,255,0.25)] py-2.5 text-sm font-medium text-[#F5F7FA] transition-colors hover:bg-[#446586]"
+            className="mb-3 flex items-center justify-center gap-1.5 rounded-lg border border-[rgba(255,255,255,0.25)] px-2 py-2 text-xs font-medium text-[#F5F7FA] transition-colors hover:bg-[#446586]"
           >
             <BackIcon />
             Back to HRMS Dashboard

@@ -75,7 +75,7 @@ test("nonce mismatch and inactive users are rejected", () => {
   assert.equal(claimsFromPayload({ success: true, audience: "project_management", nonce: "x", user: hrmsUser({ is_active: false }) }, "x"), null);
 });
 
-test("resolveAccess maps roles, president, IT dept and denies others", () => {
+test("resolveAccess maps roles and president; everyone else is it_staff", () => {
   const base = { accountType: "employee", position: "", departmentCode: "", departmentName: "" };
   const env = {};
   assert.equal(resolveAccess({ ...base, accountType: "super_admin" }, env), "super_admin");
@@ -83,8 +83,8 @@ test("resolveAccess maps roles, president, IT dept and denies others", () => {
   assert.equal(resolveAccess({ ...base, accountType: "president" }, env), "president");
   assert.equal(resolveAccess({ ...base, departmentCode: "IT" }, env), "it_staff");
   assert.equal(resolveAccess({ ...base, departmentName: "Information Technology" }, env), "it_staff");
-  assert.equal(resolveAccess({ ...base, accountType: "hr_admin", departmentCode: "HR" }, env), null);
-  assert.equal(resolveAccess({ ...base, departmentCode: "ACCT" }, { IT_PM_IT_DEPARTMENT_CODES: "ACCT" }), "it_staff");
+  assert.equal(resolveAccess({ ...base, accountType: "hr_admin", departmentCode: "HR" }, env), "it_staff");
+  assert.equal(resolveAccess({ ...base }, env), "it_staff");
 });
 
 test("canEditProject: managers edit all, IT staff only own/assigned", () => {
