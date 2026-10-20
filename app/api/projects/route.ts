@@ -29,7 +29,7 @@ function clean(body: unknown): StoredProject | null {
     projectName,
     projectLink: safeHttpUrl(row.projectLink),
     trelloLink: safeHttpUrl(row.trelloLink),
-    status: typeof row.status === "string" ? row.status : "Not started",
+    status: typeof row.status === "string" ? row.status : "Under Review",
     progress: Math.min(100, Math.max(0, Number(row.progress) || 0)),
     deadline,
     notes: typeof row.notes === "string" ? row.notes.trim() : "",

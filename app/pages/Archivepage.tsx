@@ -88,15 +88,23 @@ export default function ArchivePage({ viewerName }: { viewerName: string }) {
               ) : (
                 projects.map((project) => (
                   <tr key={project.id} className="border-t border-[#e6edf3] text-[#193956]">
-                    <td className="px-5 py-3.5 whitespace-nowrap">{project.name}</td>
-                    <td className="px-5 py-3.5 font-medium">{project.projectName}</td>
-                    <td className="px-5 py-3.5 text-[#5c6b7a]">
-                      {(project.assignees ?? []).length > 0
-                        ? project.assignees?.join(", ")
-                        : "No IT staff assigned"}
+                    <td className="px-5 py-3.5 align-top whitespace-nowrap">{project.name}</td>
+                    <td className="px-5 py-3.5 align-top font-medium">{project.projectName}</td>
+                    <td className="px-5 py-3.5 align-top text-[#5c6b7a]">
+                      {(project.assignees ?? []).length > 0 ? (
+                        <ul className="space-y-1">
+                          {project.assignees?.map((name) => (
+                            <li key={name} className="whitespace-nowrap leading-5">
+                              {name}
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        "No IT staff assigned"
+                      )}
                     </td>
-                    <td className="px-5 py-3.5 whitespace-nowrap">{project.status}</td>
-                    <td className="px-5 py-3.5">
+                    <td className="px-5 py-3.5 align-top whitespace-nowrap">{project.status}</td>
+                    <td className="px-5 py-3.5 align-top">
                       <button
                         type="button"
                         disabled={busyId === project.id}

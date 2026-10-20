@@ -24,7 +24,7 @@ const emptyForm: ProjectForm = {
   projectName: "",
   projectLink: "",
   trelloLink: "",
-  status: "Not started",
+  status: "Under Review",
   progress: "0",
   deadline: "",
   assignees: [],
@@ -49,7 +49,6 @@ const statusStyles: Record<string, string> = {
   "In Progress": "bg-[#e8f1fb] text-[#1d4e89]",
   "Under Review": "bg-[#fff6df] text-[#8a5b00]",
   Completed: "bg-[#e7f6ee] text-[#1f7a45]",
-  "Not started": "bg-[#eef2f6] text-[#5c6b7a]",
 };
 
 const deadlineFormat = new Intl.DateTimeFormat("en-US", {
@@ -520,7 +519,7 @@ export default function Homepage({
                   key={project.id}
                   className="group border-t border-[#e6edf3] text-[#193956]"
                 >
-                  <td className="sticky left-0 bg-white px-5 py-3.5 whitespace-nowrap group-hover:bg-[#f7fafc]">
+                  <td className="sticky left-0 bg-white px-5 py-3.5 align-top whitespace-nowrap group-hover:bg-[#f7fafc]">
                     <span className="flex items-center gap-2.5">
                       <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#c9973a] text-[11px] font-bold text-white shadow-[0_0_0_2px_rgba(201,151,58,0.25)]">
                         {initials(project.name)}
@@ -528,43 +527,53 @@ export default function Homepage({
                       {project.name}
                     </span>
                   </td>
-                  <td className="px-5 py-3.5 font-medium group-hover:bg-[#f7fafc]">
+                  <td className="px-5 py-3.5 align-top font-medium group-hover:bg-[#f7fafc]">
                     {project.projectName}
                   </td>
-                  <td className="px-5 py-3.5 text-[#5c6b7a] group-hover:bg-[#f7fafc]">
-                    {(assignedBy[project.id] ?? []).length > 0
-                      ? assignedBy[project.id].join(", ")
-                      : "No IT staff assigned"}
+                  <td className="px-5 py-3.5 align-top text-[#5c6b7a] group-hover:bg-[#f7fafc]">
+                    {(assignedBy[project.id] ?? []).length > 0 ? (
+                      <ul className="space-y-1">
+                        {assignedBy[project.id].map((name) => (
+                          <li key={name} className="whitespace-nowrap leading-5">
+                            {name}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      "No IT staff assigned"
+                    )}
                   </td>
-                  <td className="px-5 py-3.5 whitespace-nowrap group-hover:bg-[#f7fafc]">
+                  <td className="px-5 py-3.5 align-top whitespace-nowrap group-hover:bg-[#f7fafc]">
                     <span
-                      className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${statusStyles[statuses[project.id]]}`}
+                      className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${statusStyles[statuses[project.id]] ?? "bg-[#fff6df] text-[#8a5b00]"}`}
                     >
                       {statuses[project.id]}
                     </span>
                   </td>
-                  <td className="px-5 py-3.5 group-hover:bg-[#f7fafc]">
+                  <td className="px-5 py-3.5 align-top group-hover:bg-[#f7fafc]">
                     <div className="flex min-w-36 items-center gap-3">
                       <div
                         className="h-1.5 flex-1 overflow-hidden rounded-full bg-[#e6edf3]"
                         role="presentation"
                       >
                         <div
-                          className="h-full rounded-full bg-[#1d4e89]"
+                          className={`h-full rounded-full ${project.progress >= 50 ? "bg-[#1f8a4c]" : "bg-[#e07a1a]"}`}
                           style={{ width: `${project.progress}%` }}
                         />
                       </div>
-                      <span className="w-9 shrink-0 text-xs font-medium text-[#5c6b7a] tabular-nums">
+                      <span
+                        className={`w-9 shrink-0 text-xs font-medium tabular-nums ${project.progress >= 50 ? "text-[#1f8a4c]" : "text-[#e07a1a]"}`}
+                      >
                         {project.progress}%
                       </span>
                     </div>
                   </td>
-                  <td className="px-5 py-3.5 whitespace-nowrap text-[#5c6b7a] group-hover:bg-[#f7fafc]">
+                  <td className="px-5 py-3.5 align-top whitespace-nowrap text-[#5c6b7a] group-hover:bg-[#f7fafc]">
                     <time dateTime={project.deadline}>
                       {deadlineFormat.format(new Date(project.deadline))}
                     </time>
                   </td>
-                  <td className="px-5 py-3.5 whitespace-nowrap group-hover:bg-[#f7fafc]">
+                  <td className="px-5 py-3.5 align-top whitespace-nowrap group-hover:bg-[#f7fafc]">
                     <div className="flex items-center gap-3">
                       <button
                         type="button"
