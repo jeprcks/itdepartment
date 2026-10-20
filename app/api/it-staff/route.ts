@@ -6,6 +6,10 @@ export async function GET() {
   if (!session) {
     return Response.json({ error: "Not signed in" }, { status: 401 });
   }
-  const staff = await listItStaff();
-  return Response.json({ staff });
+  try {
+    const staff = await listItStaff();
+    return Response.json({ staff });
+  } catch {
+    return Response.json({ staff: [] });
+  }
 }
