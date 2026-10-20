@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence } from "motion/react";
 import Modal from "@/components/modal";
+import PageHeader from "@/components/page-header";
 import type { HistoryEntry } from "@/lib/history.ts";
 
 function describeLog(entry: HistoryEntry) {
@@ -13,6 +14,12 @@ function describeLog(entry: HistoryEntry) {
   }
   if (entry.action === "Removed" && person) {
     return `${who} removed ${person} from the IT staff on this project.`;
+  }
+  if (entry.action === "Archived") {
+    return `${who} moved this project to the archive.`;
+  }
+  if (entry.action === "Restored") {
+    return `${who} reopened this project from the archive.`;
   }
   if (entry.action === "Deleted") {
     return `${who} deleted this project.`;
@@ -74,18 +81,13 @@ export default function HistoryPage() {
 
   return (
     <div className="flex min-h-dvh flex-1 flex-col bg-[#f4f7fb] px-5 py-5 font-sans sm:px-7 sm:py-6">
-      <div className="mb-5">
-        <p className="text-[11px] font-semibold tracking-[0.14em] text-[#8aa0b3] uppercase">
-          IT Department
-        </p>
-        <h1 className="mt-1 text-2xl font-semibold tracking-tight text-[#193956]">Logs</h1>
-        <p className="mt-1 text-sm text-[#5c6b7a]">
-          A record of who changed a project and what they changed.
-        </p>
-      </div>
+      <PageHeader
+        title="Logs"
+        description="A record of who changed a project and what they changed."
+      />
       <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-[#d7e0ea] bg-white shadow-sm">
         <header className="shrink-0 border-b border-[#e6edf3] px-5 py-4">
-          <h2 className="text-base font-semibold text-[#193956]">Activity</h2>
+          <h2 className="text-sm font-bold tracking-tight text-[#193956]">Activity</h2>
         </header>
         <div className="min-h-0 flex-1 overflow-auto">
           <table className="w-full min-w-[880px] border-collapse text-left text-sm">

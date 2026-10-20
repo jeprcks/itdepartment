@@ -3,6 +3,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import DepartmentLoading from "@/components/department-loading";
+import PageHeader from "@/components/page-header";
 import Modal from "@/components/modal";
 import { canAnnounceNotes, canEditProject, type AccessLevel } from "@/lib/sso/access.ts";
 
@@ -65,7 +66,6 @@ export default function Homepage({
 }) {
   const [selected, setSelected] = useState<Project | null>(null);
   const [assignedBy, setAssignedBy] = useState<Record<string, string[]>>({});
-  const [openAssign, setOpenAssign] = useState<string | null>(null);
   const [statuses, setStatuses] = useState<Record<string, string>>({});
   const [projectRows, setProjectRows] = useState<Project[]>([]);
   const [statusFilter, setStatusFilter] = useState("All");
@@ -193,7 +193,7 @@ export default function Homepage({
 
   async function removeProject(project: Project) {
     if (!canEdit(project)) return;
-    if (!window.confirm(`Delete ${project.projectName}? This removes it from the project table.`)) return;
+    if (!window.confirm(`Archive ${project.projectName}? You can reopen it from the Archive page.`)) return;
     const response = await fetch("/api/projects", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -203,11 +203,11 @@ export default function Homepage({
     const body = (await response.json()) as { projects?: (Project & { assignees?: string[] })[] };
     applyProjects(body.projects ?? []);
     notify({
-      action: "Deleted",
+      action: "Archived",
       project: project.projectName,
       employee: project.name,
-      detail: "Removed from the project table",
-      message: `${viewer.name} deleted ${project.projectName}.`,
+      detail: "Moved to the archive",
+      message: `${viewer.name} archived ${project.projectName}.`,
     });
   }
 
@@ -221,20 +221,6 @@ export default function Homepage({
     const body = (await response.json()) as { projects?: (Project & { assignees?: string[] })[] };
     applyProjects(body.projects ?? []);
     return true;
-  }
-
-  function toggleDeveloper(projectId: string, developer: string) {
-    const target = projectRows.find((project) => project.id === projectId);
-    if (!target || !canEdit(target)) return;
-    const projectLabel = target.projectName || "a project";
-    const previous = assignedBy[projectId] ?? [];
-    const next = previous.includes(developer)
-      ? previous.filter((name) => name !== developer)
-      : [...previous, developer];
-    setAssignedBy((current) => ({ ...current, [projectId]: next }));
-    void persist({ ...target, status: statuses[projectId] ?? target.status }, next).then((saved) => {
-      if (saved) notifyAssignmentChange(projectLabel, previous, next);
-    });
   }
 
   useEffect(() => {
@@ -395,18 +381,10 @@ export default function Homepage({
           <DepartmentLoading />
         </div>
       ) : null}
-      <div className="mb-4 flex shrink-0 items-end justify-between gap-4">
-        <div>
-          <p className="text-[11px] font-semibold tracking-[0.14em] text-[#8aa0b3] uppercase">
-            IT Department
-          </p>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-[#193956]">
-            Project monitoring
-          </h1>
-          <p className="mt-1 text-sm text-[#5c6b7a]">
-            See who owns each project, who is assigned, and what is due.
-          </p>
-        </div>
+      <PageHeader
+        title="Project monitoring"
+        description="See who owns each project, who is assigned, and what is due."
+      >
         <button
           type="button"
           aria-label="Notifications"
@@ -429,7 +407,7 @@ export default function Homepage({
             </span>
           ) : null}
         </button>
-      </div>
+      </PageHeader>
       <div
         className="mb-5 grid shrink-0 grid-cols-2 gap-3 lg:grid-cols-5"
         role="group"
@@ -467,7 +445,7 @@ export default function Homepage({
       <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-[#d7e0ea] bg-white shadow-sm">
         <header className="flex shrink-0 items-center justify-between gap-3 border-b border-[#e6edf3] px-5 py-4">
           <div>
-            <h2 className="text-base font-semibold text-[#193956]">Projects</h2>
+            <h2 className="text-sm font-bold tracking-tight text-[#193956]">Projects</h2>
             <p className="mt-0.5 text-xs text-[#5c6b7a]">
               {visibleRows.length} shown
             </p>
@@ -553,71 +531,10 @@ export default function Homepage({
                   <td className="px-5 py-3.5 font-medium group-hover:bg-[#f7fafc]">
                     {project.projectName}
                   </td>
-                  <td className="px-5 py-3.5 group-hover:bg-[#f7fafc]">
-                    <div className="relative min-w-52">
-                      <button
-                        type="button"
-                        aria-haspopup="listbox"
-                        disabled={!canEdit(project)}
-                        aria-expanded={openAssign === project.id}
-                        onClick={() =>
-                          setOpenAssign((current) =>
-                            current === project.id
-                              ? null
-                              : project.id,
-                          )
-                        }
-                        className="flex h-9 w-full items-center justify-between gap-2 rounded-md border border-[#d7e0ea] bg-white px-3 text-left text-xs text-[#193956]"
-                      >
-                        <span className="truncate">
-                          {(assignedBy[project.id] ?? []).length > 0
-                            ? assignedBy[project.id].join(", ")
-                            : "Select IT staff"}
-                        </span>
-                        <span aria-hidden="true" className="text-[#8aa0b3]">
-                          ▾
-                        </span>
-                      </button>
-                      {openAssign === project.id ? (
-                        <ul
-                          role="listbox"
-                          aria-label={`Assigned IT staff for ${project.projectName}`}
-                          aria-multiselectable="true"
-                          className="absolute z-20 mt-1 w-full rounded-md border border-[#d7e0ea] bg-white py-1 shadow-lg"
-                        >
-                          {itStaff.map((person) => {
-                            const selected = (
-                              assignedBy[project.id] ?? []
-                            ).includes(person.name);
-                            return (
-                              <li key={person.name} role="option" aria-selected={selected}>
-                                <label className="flex cursor-pointer items-center gap-2 px-3 py-2 text-xs hover:bg-[#f5f7fa]">
-                                  <input
-                                    type="checkbox"
-                                    checked={selected}
-                                    onChange={() =>
-                                      toggleDeveloper(
-                                        project.id,
-                                        person.name,
-                                      )
-                                    }
-                                    className="accent-[#1d4e89]"
-                                  />
-                                  <span>
-                                    <span className="block font-medium text-[#193956]">
-                                      {person.name}
-                                    </span>
-                                    <span className="block text-[#5c6b7a]">
-                                      {person.title}
-                                    </span>
-                                  </span>
-                                </label>
-                              </li>
-                            );
-                          })}
-                        </ul>
-                      ) : null}
-                    </div>
+                  <td className="px-5 py-3.5 text-[#5c6b7a] group-hover:bg-[#f7fafc]">
+                    {(assignedBy[project.id] ?? []).length > 0
+                      ? assignedBy[project.id].join(", ")
+                      : "No IT staff assigned"}
                   </td>
                   <td className="px-5 py-3.5 whitespace-nowrap group-hover:bg-[#f7fafc]">
                     <span
@@ -670,7 +587,7 @@ export default function Homepage({
                         onClick={() => void removeProject(project)}
                         className="text-xs font-medium text-[#9b2c2c] underline decoration-[#9b2c2c]/30 underline-offset-2 hover:decoration-[#9b2c2c]"
                       >
-                        Delete
+                        Archive
                       </button>
                     </div>
                   </td>

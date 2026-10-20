@@ -102,6 +102,10 @@ export async function saveStaffNotification(input: {
   const recipient = input.recipient.trim();
   const actor = input.actor.trim();
   if (!recipient || !actor || recipient.toLowerCase() === actor.toLowerCase()) return;
+  if (readHandshakeConfig()) {
+    await notificationsFromHris({ action: "notifications_save", recipient, actor, message: input.message });
+    return;
+  }
   const connection = await connect().catch(() => null);
   if (!connection) {
     await notificationsFromHris({ action: "notifications_save", recipient, actor, message: input.message });
@@ -121,6 +125,9 @@ export async function saveStaffNotification(input: {
 export async function listStaffNotifications(recipient: string): Promise<StaffNotification[]> {
   const name = recipient.trim();
   if (!name) return [];
+  if (readHandshakeConfig()) {
+    return (await notificationsFromHris({ action: "notifications_list", recipient: name, actor: name })) ?? [];
+  }
   const connection = await connect().catch(() => null);
   if (!connection) return (await notificationsFromHris({ action: "notifications_list", recipient: name, actor: name })) ?? [];
   try {
@@ -128,7 +135,7 @@ export async function listStaffNotifications(recipient: string): Promise<StaffNo
     const [rows] = await connection.query(
       `SELECT id, actor, message, created_at, read_at
        FROM project_staff_notifications
-       WHERE recipient = ? AND LOWER(actor) <> LOWER(?)
+       WHERE LOWER(TRIM(recipient)) = LOWER(TRIM(?)) AND LOWER(actor) <> LOWER(?)
        ORDER BY id DESC
        LIMIT 50`,
       [name, name],
@@ -155,6 +162,10 @@ export async function listStaffNotifications(recipient: string): Promise<StaffNo
 export async function markStaffNotificationsRead(recipient: string) {
   const name = recipient.trim();
   if (!name) return;
+  if (readHandshakeConfig()) {
+    await notificationsFromHris({ action: "notifications_read", recipient: name, actor: name });
+    return;
+  }
   const connection = await connect().catch(() => null);
   if (!connection) {
     await notificationsFromHris({ action: "notifications_read", recipient: name, actor: name });
@@ -163,7 +174,7 @@ export async function markStaffNotificationsRead(recipient: string) {
   try {
     await ensureTable(connection);
     await connection.query(
-      `UPDATE project_staff_notifications SET read_at = NOW() WHERE recipient = ? AND read_at IS NULL`,
+      `UPDATE project_staff_notifications SET read_at = NOW() WHERE LOWER(TRIM(recipient)) = LOWER(TRIM(?)) AND read_at IS NULL`,
       [name],
     );
   } finally {

@@ -110,6 +110,7 @@ async function logsFromHris(entry?: Omit<ActivityLog, "id" | "time" | "at">): Pr
 }
 
 export async function listActivityLogs(): Promise<ActivityLog[]> {
+  if (readHandshakeConfig()) return (await logsFromHris()) ?? [];
   const connection = await connect().catch(() => null);
   if (!connection) return (await logsFromHris()) ?? [];
   try {
@@ -125,6 +126,11 @@ export async function listActivityLogs(): Promise<ActivityLog[]> {
 }
 
 export async function saveActivityLog(entry: Omit<ActivityLog, "id" | "time" | "at">): Promise<void> {
+  if (readHandshakeConfig()) {
+    const saved = await logsFromHris(entry);
+    if (!saved) throw new Error("Log was not saved");
+    return;
+  }
   const connection = await connect().catch(() => null);
   if (!connection) {
     const saved = await logsFromHris(entry);

@@ -14,7 +14,8 @@ async function DeniedContent({
   return (
     <main className="flex min-h-dvh flex-1 items-center justify-center bg-[#f5f7fa] p-6 font-sans">
       <div className="max-w-md rounded-xl border border-[#d7e0ea] bg-white p-8 text-center shadow-sm">
-        <h1 className="text-xl font-semibold text-[#193956]">
+        <p className="text-[11px] font-bold tracking-[0.16em] text-[#c9973a] uppercase">IT Department</p>
+        <h1 className="mt-2 text-[1.65rem] leading-none font-bold tracking-tight text-[#193956]">
           {signin ? "Please sign in through HRMS" : "Access restricted"}
         </h1>
         <p className="mt-3 text-sm text-[#5c6b7a]">

@@ -1,4 +1,4 @@
-import { deleteProject, listProjects, saveProject, type StoredProject } from "@/lib/projects.ts";
+import { archiveProject, listArchivedProjects, listProjects, restoreProject, saveProject, type StoredProject } from "@/lib/projects.ts";
 import { getSession } from "@/lib/sso/session.ts";
 
 function safeHttpUrl(value: unknown) {
@@ -39,10 +39,11 @@ function clean(body: unknown): StoredProject | null {
   };
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   const session = await getSession();
   if (!session) return Response.json({ error: "Not signed in" }, { status: 401 });
-  const projects = await listProjects();
+  const archived = new URL(request.url).searchParams.get("archived") === "1";
+  const projects = archived ? await listArchivedProjects() : await listProjects();
   return Response.json({ projects });
 }
 
@@ -54,11 +55,12 @@ export async function POST(request: Request) {
     if (!/^[0-9a-f-]{36}$/i.test(body.id)) {
       return Response.json({ error: "Invalid project" }, { status: 400 });
     }
+    const restore = (body as { restore?: unknown }).restore === true;
     try {
-      const projects = await deleteProject(body.id);
+      const projects = restore ? await restoreProject(body.id) : await archiveProject(body.id);
       return Response.json({ projects });
     } catch {
-      return Response.json({ error: "Project was not deleted" }, { status: 502 });
+      return Response.json({ error: restore ? "Project was not restored" : "Project was not archived" }, { status: 502 });
     }
   }
   const project = clean(body?.project);

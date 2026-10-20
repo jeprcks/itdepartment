@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 const items = [
   { href: "/", label: "Dashboard", icon: "bi-speedometer2" },
   { href: "/logs", label: "Logs", icon: "bi-journal-text" },
+  { href: "/archive", label: "Archive", icon: "bi-archive" },
 ];
 
 export default function SidebarNav() {

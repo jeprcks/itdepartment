@@ -26,6 +26,7 @@ const tableSql = `CREATE TABLE IF NOT EXISTS it_department_projects (
   deadline DATE NOT NULL,
   notes TEXT NOT NULL,
   assignees TEXT NOT NULL,
+  archived TINYINT NOT NULL DEFAULT 0,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 )`;
 
@@ -83,7 +84,7 @@ async function connect() {
 }
 
 async function projectsFromHris(
-  action: "projects_list" | "projects_save" | "projects_delete" = "projects_list",
+  action: "projects_list" | "projects_save" | "projects_delete" | "projects_restore" | "projects_archived" = "projects_list",
   extra: { project?: StoredProject; id?: string } = {},
 ): Promise<StoredProject[] | null> {
   const config = readHandshakeConfig();
@@ -127,13 +128,14 @@ async function projectsFromHris(
 }
 
 export async function listProjects(): Promise<StoredProject[]> {
+  if (readHandshakeConfig()) return (await projectsFromHris()) ?? [];
   const connection = await connect().catch(() => null);
   if (!connection) return (await projectsFromHris()) ?? [];
   try {
     await connection.query(tableSql);
     const [rows] = await connection.query(
       `SELECT id, owner_name, project_name, project_link, trello_link, status, progress, deadline, notes, assignees
-       FROM it_department_projects ORDER BY updated_at DESC`,
+       FROM it_department_projects WHERE archived = 0 ORDER BY updated_at DESC`,
     );
     return (rows as Parameters<typeof mapRow>[0][]).map(mapRow);
   } finally {
@@ -142,6 +144,11 @@ export async function listProjects(): Promise<StoredProject[]> {
 }
 
 export async function saveProject(project: StoredProject): Promise<StoredProject[]> {
+  if (readHandshakeConfig()) {
+    const saved = await projectsFromHris("projects_save", { project });
+    if (!saved) throw new Error("Project was not saved");
+    return saved;
+  }
   const connection = await connect().catch(() => null);
   if (!connection) {
     const saved = await projectsFromHris("projects_save", { project });
@@ -180,7 +187,7 @@ export async function saveProject(project: StoredProject): Promise<StoredProject
     );
     const [rows] = await connection.query(
       `SELECT id, owner_name, project_name, project_link, trello_link, status, progress, deadline, notes, assignees
-       FROM it_department_projects ORDER BY updated_at DESC`,
+       FROM it_department_projects WHERE archived = 0 ORDER BY updated_at DESC`,
     );
     return (rows as Parameters<typeof mapRow>[0][]).map(mapRow);
   } finally {
@@ -188,23 +195,20 @@ export async function saveProject(project: StoredProject): Promise<StoredProject
   }
 }
 
-export async function deleteProject(id: string): Promise<StoredProject[]> {
+export async function archiveProject(id: string): Promise<StoredProject[]> {
   if (!/^[0-9a-f-]{36}$/i.test(id)) throw new Error("Invalid project");
-  const connection = await connect().catch(() => null);
-  if (!connection) {
-    const saved = await projectsFromHris("projects_delete", { id });
-    if (!saved) throw new Error("Project was not deleted");
-    return saved;
-  }
-  try {
-    await connection.query(tableSql);
-    await connection.query(`DELETE FROM it_department_projects WHERE id = ?`, [id]);
-    const [rows] = await connection.query(
-      `SELECT id, owner_name, project_name, project_link, trello_link, status, progress, deadline, notes, assignees
-       FROM it_department_projects ORDER BY updated_at DESC`,
-    );
-    return (rows as Parameters<typeof mapRow>[0][]).map(mapRow);
-  } finally {
-    await connection.end();
-  }
+  const saved = await projectsFromHris("projects_delete", { id });
+  if (!saved) throw new Error("Project was not archived");
+  return saved;
+}
+
+export async function listArchivedProjects(): Promise<StoredProject[]> {
+  return (await projectsFromHris("projects_archived")) ?? [];
+}
+
+export async function restoreProject(id: string): Promise<StoredProject[]> {
+  if (!/^[0-9a-f-]{36}$/i.test(id)) throw new Error("Invalid project");
+  const saved = await projectsFromHris("projects_restore", { id });
+  if (!saved) throw new Error("Project was not restored");
+  return saved;
 }

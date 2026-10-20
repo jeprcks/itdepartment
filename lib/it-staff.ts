@@ -60,6 +60,7 @@ async function listItStaffFromHris(): Promise<ItStaff[]> {
 }
 
 export async function listItStaff(): Promise<ItStaff[]> {
+  if (readHandshakeConfig()) return listItStaffFromHris();
   const host = process.env.DB_HOST;
   const database = process.env.DB_NAME;
   const user = process.env.DB_USER;

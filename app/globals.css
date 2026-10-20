@@ -24,3 +24,10 @@ body {
   color: #193956;
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
 }
+
+table thead th {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}

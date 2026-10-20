@@ -10,6 +10,8 @@ const ACTIONS = new Set([
   "Note added",
   "Note updated",
   "Deleted",
+  "Archived",
+  "Restored",
 ]);
 
 export async function GET() {
