@@ -316,20 +316,31 @@ export default function Homepage({
     };
     void persist(nextProject, editForm.assignees).then((saved) => {
       if (!saved || !previous) return;
-    if ((statuses[editingId] ?? previous.status) !== editForm.status) {
+    const previousStatus = statuses[editingId] ?? previous.status;
+    const statusChanged = previousStatus !== editForm.status;
+    const progressChanged = previous.progress !== progress;
+    if (statusChanged) {
       notify({
         action: "Status changed",
         project: projectName,
         employee: name,
-        detail: `${statuses[editingId] ?? previous.status} to ${editForm.status}`,
+        detail: `${previousStatus} to ${editForm.status}`,
         message: `${projectName} status changed to ${editForm.status}.`,
       });
-    } else if (previous) {
+    }
+    const changed: string[] = [];
+    if (previous.name !== name) changed.push("owner");
+    if (previous.projectName !== projectName) changed.push("project name");
+    if (previous.projectLink !== nextProject.projectLink) changed.push("website");
+    if (previous.trelloLink !== nextProject.trelloLink) changed.push("Trello");
+    if (previous.deadline !== nextProject.deadline) changed.push("deadline");
+    if (progressChanged) changed.push(`progress to ${progress}%`);
+    if (changed.length > 0) {
       notify({
         action: "Updated",
         project: projectName,
         employee: name,
-        detail: `${editForm.status}, ${progress}%`,
+        detail: changed.join(", "),
         message: `${projectName} was updated.`,
       });
     }
@@ -746,23 +757,23 @@ export default function Homepage({
           <form
             onSubmit={saveEdit}
           >
-            <header className="flex items-center justify-between border-b border-[#e6edf3] px-5 py-4">
+            <header className="border-b border-[#e6edf3] px-5 py-4">
               <h2
                 id="edit-project-title"
                 className="text-lg font-semibold text-[#193956]"
               >
                 Edit project
               </h2>
+            </header>
+            <ProjectFields form={editForm} onChange={setEditForm} includeLinks staff={itStaff} />
+            <div className="flex justify-end gap-2 border-t border-[#e6edf3] px-5 py-4">
               <button
                 type="button"
                 onClick={() => setEditingId(null)}
-                className="rounded-md px-2 py-1 text-sm text-[#5c6b7a] hover:bg-[#f5f7fa] hover:text-[#193956]"
+                className="rounded-md px-4 py-2 text-sm font-medium text-[#5c6b7a] hover:bg-[#f5f7fa] hover:text-[#193956]"
               >
                 Close
               </button>
-            </header>
-            <ProjectFields form={editForm} onChange={setEditForm} includeLinks staff={itStaff} />
-            <div className="flex justify-end border-t border-[#e6edf3] px-5 py-4">
               <button
                 type="submit"
                 className="rounded-md bg-[#193956] px-4 py-2 text-sm font-medium text-white hover:bg-[#385875]"
