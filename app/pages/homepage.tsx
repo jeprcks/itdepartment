@@ -102,6 +102,31 @@ export default function Homepage({
     };
   }, []);
 
+  function applyProjects(
+    projects: (Project & { assignees?: string[] })[],
+  ) {
+    setProjectRows(projects);
+    setStatuses(Object.fromEntries(projects.map((project) => [project.id, project.status])));
+    setAssignedBy(
+      Object.fromEntries(projects.map((project) => [project.id, project.assignees ?? []])),
+    );
+  }
+
+  useEffect(() => {
+    let active = true;
+    fetch("/api/projects")
+      .then((response) => (response.ok ? response.json() : { projects: [] }))
+      .then((body: { projects?: (Project & { assignees?: string[] })[] }) => {
+        if (active) applyProjects(body.projects ?? []);
+      })
+      .catch(() => {
+        if (active) applyProjects([]);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
   useEffect(() => {
     let active = true;
     fetch("/api/it-staff")
@@ -174,18 +199,30 @@ export default function Homepage({
     }
   }
 
+  async function persist(project: Project, assignees: string[]) {
+    const response = await fetch("/api/projects", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ project: { ...project, assignees } }),
+    });
+    if (!response.ok) return false;
+    const body = (await response.json()) as { projects?: (Project & { assignees?: string[] })[] };
+    applyProjects(body.projects ?? []);
+    return true;
+  }
+
   function toggleDeveloper(projectId: string, developer: string) {
     const target = projectRows.find((project) => project.id === projectId);
     if (!target || !canEdit(target)) return;
-    const projectLabel =
-      projectRows.find((project) => project.id === projectId)?.projectName ??
-      "a project";
+    const projectLabel = target.projectName || "a project";
     const previous = assignedBy[projectId] ?? [];
     const next = previous.includes(developer)
       ? previous.filter((name) => name !== developer)
       : [...previous, developer];
     setAssignedBy((current) => ({ ...current, [projectId]: next }));
-    notifyAssignmentChange(projectLabel, previous, next);
+    void persist({ ...target, status: statuses[projectId] ?? target.status }, next).then((saved) => {
+      if (saved) notifyAssignmentChange(projectLabel, previous, next);
+    });
   }
 
   useEffect(() => {
@@ -222,12 +259,8 @@ export default function Homepage({
       notes: addForm.notes.trim(),
     };
 
-    setProjectRows((current) => [...current, project]);
-    setStatuses((current) => ({ ...current, [project.id]: project.status }));
-    setAssignedBy((current) => ({
-      ...current,
-      [project.id]: addForm.assignees,
-    }));
+    void persist(project, addForm.assignees).then((saved) => {
+      if (!saved) return;
     notify({
       action: "Added",
       project: project.projectName,
@@ -238,6 +271,7 @@ export default function Homepage({
     notifyAssignmentChange(project.projectName, [], addForm.assignees);
     setAddForm(emptyForm);
     setAdding(false);
+    });
   }
 
   function openEdit(project: Project) {
@@ -268,29 +302,20 @@ export default function Homepage({
     const previous = projectRows.find((project) => project.id === editingId);
     const previousAssignees = assignedBy[editingId] ?? [];
     const nextNotes = editForm.notes.trim();
-    setProjectRows((current) =>
-      current.map((project) =>
-        project.id === editingId
-          ? {
-              ...project,
-              name,
-              projectName,
-              projectLink: editForm.projectLink.trim(),
-              trelloLink: editForm.trelloLink.trim(),
-              status: editForm.status,
-              progress,
-              deadline: editForm.deadline,
-              notes: nextNotes,
-            }
-          : project,
-      ),
-    );
-    setStatuses((current) => ({ ...current, [editingId]: editForm.status }));
-    setAssignedBy((current) => ({
-      ...current,
-      [editingId]: editForm.assignees,
-    }));
-    if (previous && (statuses[editingId] ?? previous.status) !== editForm.status) {
+    const nextProject: Project = {
+      id: editingId,
+      name,
+      projectName,
+      projectLink: editForm.projectLink.trim(),
+      trelloLink: editForm.trelloLink.trim(),
+      status: editForm.status,
+      progress,
+      deadline: editForm.deadline,
+      notes: nextNotes,
+    };
+    void persist(nextProject, editForm.assignees).then((saved) => {
+      if (!saved || !previous) return;
+    if ((statuses[editingId] ?? previous.status) !== editForm.status) {
       notify({
         action: "Status changed",
         project: projectName,
@@ -318,6 +343,7 @@ export default function Homepage({
     }
     notifyAssignmentChange(projectName, previousAssignees, editForm.assignees);
     setEditingId(null);
+    });
   }
 
   const visibleNotifications = notifications.filter(

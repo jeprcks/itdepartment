@@ -1,4 +1,6 @@
+import { randomBytes } from "node:crypto";
 import mysql from "mysql2/promise";
+import { readHandshakeConfig, readSignedJson, signTimestampBody } from "@/lib/sso/handshake.ts";
 
 export type StaffNotification = {
   id: number;
@@ -18,6 +20,60 @@ async function connect() {
     database,
     user,
     password: process.env.DB_PASS ?? "",
+    connectTimeout: 4000,
+  });
+}
+
+async function notificationsFromHris(input: {
+  action: "notifications_list" | "notifications_save";
+  recipient: string;
+  actor: string;
+  message?: string;
+}): Promise<StaffNotification[] | null> {
+  const config = readHandshakeConfig();
+  if (!config) return null;
+  const nonce = randomBytes(16).toString("hex");
+  const raw = JSON.stringify({
+    action: input.action,
+    audience: "project_management",
+    nonce,
+    recipient: input.recipient,
+    actor: input.actor,
+    message: input.message ?? "",
+  });
+  const timestamp = String(Math.floor(Date.now() / 1000));
+  const response = await fetch(config.consumeUrl.replace(/\/consume\/?$/, "/notifications"), {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-SSO-Timestamp": timestamp,
+      "X-SSO-Signature": signTimestampBody(config.secret, timestamp, raw),
+    },
+    body: raw,
+    cache: "no-store",
+  });
+  const responseRaw = await response.text();
+  const verified = readSignedJson(
+    config.secret,
+    responseRaw,
+    response.headers.get("x-sso-timestamp") ?? "",
+    response.headers.get("x-sso-signature") ?? "",
+    Number(timestamp),
+  );
+  if (!verified.ok || verified.payload.success !== true || verified.payload.nonce !== nonce) return null;
+  const rows = verified.payload.notifications;
+  if (!Array.isArray(rows)) return [];
+  return rows.flatMap((item) => {
+    if (!item || typeof item !== "object") return [];
+    const row = item as { id?: unknown; message?: unknown; time?: unknown; actor?: unknown };
+    const message = typeof row.message === "string" ? row.message : "";
+    if (!message) return [];
+    return [{
+      id: Number(row.id),
+      message,
+      time: typeof row.time === "string" ? row.time : "",
+      actor: typeof row.actor === "string" ? row.actor : "",
+    }];
   });
 }
 
@@ -42,8 +98,11 @@ export async function saveStaffNotification(input: {
   const recipient = input.recipient.trim();
   const actor = input.actor.trim();
   if (!recipient || !actor || recipient.toLowerCase() === actor.toLowerCase()) return;
-  const connection = await connect();
-  if (!connection) return;
+  const connection = await connect().catch(() => null);
+  if (!connection) {
+    await notificationsFromHris({ action: "notifications_save", recipient, actor, message: input.message });
+    return;
+  }
   try {
     await ensureTable(connection);
     await connection.query(
@@ -58,8 +117,8 @@ export async function saveStaffNotification(input: {
 export async function listStaffNotifications(recipient: string): Promise<StaffNotification[]> {
   const name = recipient.trim();
   if (!name) return [];
-  const connection = await connect();
-  if (!connection) return [];
+  const connection = await connect().catch(() => null);
+  if (!connection) return (await notificationsFromHris({ action: "notifications_list", recipient: name, actor: name })) ?? [];
   try {
     await ensureTable(connection);
     const [rows] = await connection.query(
