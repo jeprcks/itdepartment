@@ -2,8 +2,8 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import { AnimatePresence, motion } from "motion/react";
+import DepartmentLoading from "@/components/department-loading";
 import Modal from "@/components/modal";
-import { recordHistory } from "@/lib/history.ts";
 import { canAnnounceNotes, canEditProject, type AccessLevel } from "@/lib/sso/access.ts";
 
 type ProjectForm = {
@@ -69,33 +69,52 @@ export default function Homepage({
   const [statuses, setStatuses] = useState<Record<string, string>>({});
   const [projectRows, setProjectRows] = useState<Project[]>([]);
   const [statusFilter, setStatusFilter] = useState("All");
+  const [search, setSearch] = useState("");
   const [adding, setAdding] = useState(false);
+  const [saveError, setSaveError] = useState("");
   const [addForm, setAddForm] = useState<ProjectForm>(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<ProjectForm>(emptyForm);
   const [notifications, setNotifications] = useState<
-    { id: string; message: string; time: string; actor: string }[]
+    { id: string; message: string; time: string; actor: string; unread: boolean }[]
   >([]);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [itStaff, setItStaff] = useState<ItStaff[]>([]);
+  const [booting, setBooting] = useState(true);
 
   useEffect(() => {
     let active = true;
-    fetch("/api/notifications")
-      .then((response) => (response.ok ? response.json() : { notifications: [] }))
-      .then((body: { notifications?: { id: number; message: string; time: string; actor: string }[] }) => {
+    Promise.all([
+      fetch("/api/notifications").then((response) => (response.ok ? response.json() : { notifications: [] })),
+      fetch("/api/projects").then((response) => (response.ok ? response.json() : { projects: [] })),
+      fetch("/api/it-staff").then((response) => (response.ok ? response.json() : { staff: [] })),
+    ])
+      .then(([notes, projectsBody, staffBody]: [
+        { notifications?: { id: number; message: string; time: string; actor: string; unread?: boolean }[] },
+        { projects?: (Project & { assignees?: string[] })[] },
+        { staff?: ItStaff[] },
+      ]) => {
         if (!active) return;
         setNotifications(
-          (body.notifications ?? []).map((item) => ({
+          (notes.notifications ?? []).map((item) => ({
             id: String(item.id),
             message: item.message,
             time: item.time,
             actor: item.actor,
+            unread: item.unread !== false,
           })),
         );
+        applyProjects(projectsBody.projects ?? []);
+        setItStaff(staffBody.staff ?? []);
       })
       .catch(() => {
-        if (active) setNotifications([]);
+        if (!active) return;
+        setNotifications([]);
+        applyProjects([]);
+        setItStaff([]);
+      })
+      .finally(() => {
+        if (active) setBooting(false);
       });
     return () => {
       active = false;
@@ -112,36 +131,6 @@ export default function Homepage({
     );
   }
 
-  useEffect(() => {
-    let active = true;
-    fetch("/api/projects")
-      .then((response) => (response.ok ? response.json() : { projects: [] }))
-      .then((body: { projects?: (Project & { assignees?: string[] })[] }) => {
-        if (active) applyProjects(body.projects ?? []);
-      })
-      .catch(() => {
-        if (active) applyProjects([]);
-      });
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    let active = true;
-    fetch("/api/it-staff")
-      .then((response) => (response.ok ? response.json() : { staff: [] }))
-      .then((body: { staff?: ItStaff[] }) => {
-        if (active) setItStaff(body.staff ?? []);
-      })
-      .catch(() => {
-        if (active) setItStaff([]);
-      });
-    return () => {
-      active = false;
-    };
-  }, []);
-
   const canEdit = (project: Project) =>
     canEditProject(viewer, { owner: project.name, assignees: assignedBy[project.id] ?? [] });
 
@@ -152,13 +141,16 @@ export default function Homepage({
     detail?: string;
     message: string;
   }) {
-    recordHistory({
-      actor: viewer.name,
-      action: input.action,
-      project: input.project,
-      employee: input.employee ?? "",
-      detail: input.detail ?? "",
-      message: input.message,
+    void fetch("/api/logs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: input.action,
+        project: input.project,
+        employee: input.employee ?? "",
+        detail: input.detail ?? "",
+        message: input.message,
+      }),
     });
     const recipient = input.employee?.trim() ?? "";
     if (
@@ -197,6 +189,26 @@ export default function Homepage({
         message: `${name} was removed from the IT staff on ${projectLabel}.`,
       });
     }
+  }
+
+  async function removeProject(project: Project) {
+    if (!canEdit(project)) return;
+    if (!window.confirm(`Delete ${project.projectName}? This removes it from the project table.`)) return;
+    const response = await fetch("/api/projects", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: project.id }),
+    });
+    if (!response.ok) return;
+    const body = (await response.json()) as { projects?: (Project & { assignees?: string[] })[] };
+    applyProjects(body.projects ?? []);
+    notify({
+      action: "Deleted",
+      project: project.projectName,
+      employee: project.name,
+      detail: "Removed from the project table",
+      message: `${viewer.name} deleted ${project.projectName}.`,
+    });
   }
 
   async function persist(project: Project, assignees: string[]) {
@@ -259,13 +271,17 @@ export default function Homepage({
       notes: addForm.notes.trim(),
     };
 
+    setSaveError("");
     void persist(project, addForm.assignees).then((saved) => {
-      if (!saved) return;
+      if (!saved) {
+        setSaveError("The project was not saved. Check the HRIS connection and try again.");
+        return;
+      }
     notify({
       action: "Added",
       project: project.projectName,
       employee: project.name,
-      detail: `${project.status}, ${project.progress}%`,
+      detail: `${project.status}, ${project.progress}% progress`,
       message: `${viewer.name} added ${project.projectName}.`,
     });
     notifyAssignmentChange(project.projectName, [], addForm.assignees);
@@ -349,10 +365,19 @@ export default function Homepage({
   const visibleNotifications = notifications.filter(
     (item) => item.actor.trim().toLowerCase() !== viewer.name.trim().toLowerCase(),
   );
-  const visibleRows = projectRows.filter(
-    (project) =>
-      statusFilter === "All" || statuses[project.id] === statusFilter,
-  );
+  const unreadCount = visibleNotifications.filter((item) => item.unread !== false).length;
+  const searchText = search.trim().toLowerCase();
+  const visibleRows = projectRows.filter((project) => {
+    const statusMatches = statusFilter === "All" || statuses[project.id] === statusFilter;
+    if (!statusMatches) return false;
+    if (!searchText) return true;
+    const assignees = assignedBy[project.id] ?? [];
+    return (
+      project.projectName.toLowerCase().includes(searchText) ||
+      project.name.toLowerCase().includes(searchText) ||
+      assignees.some((name) => name.toLowerCase().includes(searchText))
+    );
+  });
   const summaryCards = [
     { label: "All projects", value: "All", count: projectRows.length },
     ...Object.keys(statusStyles).map((status) => ({
@@ -364,7 +389,12 @@ export default function Homepage({
   ];
 
   return (
-    <div className="flex min-h-dvh flex-1 flex-col bg-[#f4f7fb] px-5 py-5 font-sans sm:px-7 sm:py-6">
+    <div className="relative flex min-h-dvh flex-1 flex-col bg-[#f4f7fb] px-5 py-5 font-sans sm:px-7 sm:py-6">
+      {booting ? (
+        <div className="absolute inset-0 z-30 flex bg-[#f4f7fb]">
+          <DepartmentLoading />
+        </div>
+      ) : null}
       <div className="mb-4 flex shrink-0 items-end justify-between gap-4">
         <div>
           <p className="text-[11px] font-semibold tracking-[0.14em] text-[#8aa0b3] uppercase">
@@ -380,13 +410,22 @@ export default function Homepage({
         <button
           type="button"
           aria-label="Notifications"
-          onClick={() => setNotificationsOpen(true)}
+          onClick={() => {
+            setNotificationsOpen(true);
+            if (unreadCount === 0) return;
+            setNotifications((current) => current.map((item) => ({ ...item, unread: false })));
+            void fetch("/api/notifications", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ read: true }),
+            });
+          }}
           className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[#d7e0ea] bg-white text-[#193956] shadow-sm transition hover:-translate-y-0.5 hover:border-[#193956]"
         >
           <BellIcon />
-          {visibleNotifications.length > 0 ? (
+          {unreadCount > 0 ? (
             <span className="absolute -top-1 -right-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-[#F0B429] px-1 text-[10px] font-semibold text-[#193956]">
-              {visibleNotifications.length}
+              {unreadCount}
             </span>
           ) : null}
         </button>
@@ -433,6 +472,13 @@ export default function Homepage({
               {visibleRows.length} shown
             </p>
           </div>
+          <input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search project, owner, or staff"
+            aria-label="Search projects"
+            className="h-10 w-full max-w-xs rounded-lg border border-[#d7e0ea] px-3 text-sm text-[#193956] outline-none focus:border-[#1d4e89]"
+          />
         </header>
         <div className="min-h-0 flex-1 overflow-auto">
           <table className="w-full min-w-[980px] border-collapse text-left text-sm">
@@ -485,7 +531,9 @@ export default function Homepage({
                   >
                     {projectRows.length === 0
                       ? "No projects yet. Use Add project to create the first one."
-                      : "Nothing matches this status."}
+                      : searchText
+                        ? "Nothing matches this search."
+                        : "Nothing matches this status."}
                   </td>
                 </tr>
               ) : null}
@@ -495,7 +543,12 @@ export default function Homepage({
                   className="group border-t border-[#e6edf3] text-[#193956]"
                 >
                   <td className="sticky left-0 bg-white px-5 py-3.5 whitespace-nowrap group-hover:bg-[#f7fafc]">
-                    {project.name}
+                    <span className="flex items-center gap-2.5">
+                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#c9973a] text-[11px] font-bold text-white shadow-[0_0_0_2px_rgba(201,151,58,0.25)]">
+                        {initials(project.name)}
+                      </span>
+                      {project.name}
+                    </span>
                   </td>
                   <td className="px-5 py-3.5 font-medium group-hover:bg-[#f7fafc]">
                     {project.projectName}
@@ -611,6 +664,14 @@ export default function Homepage({
                       >
                         Edit
                       </button>
+                      <button
+                        type="button"
+                        hidden={!canEdit(project)}
+                        onClick={() => void removeProject(project)}
+                        className="text-xs font-medium text-[#9b2c2c] underline decoration-[#9b2c2c]/30 underline-offset-2 hover:decoration-[#9b2c2c]"
+                      >
+                        Delete
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -654,7 +715,7 @@ export default function Homepage({
             <div className="flex flex-col gap-5 px-6 py-5">
               <div>
                 <p className="text-xs font-medium text-[#5c6b7a]">Website</p>
-                {selected.projectLink ? (
+                {selected.projectLink.startsWith("http://") || selected.projectLink.startsWith("https://") ? (
                   <a
                     href={selected.projectLink}
                     target="_blank"
@@ -669,7 +730,7 @@ export default function Homepage({
               </div>
               <div>
                 <p className="text-xs font-medium text-[#5c6b7a]">Trello</p>
-                {selected.trelloLink ? (
+                {selected.trelloLink.startsWith("http://") || selected.trelloLink.startsWith("https://") ? (
                   <a
                     href={selected.trelloLink}
                     target="_blank"
@@ -818,7 +879,8 @@ export default function Homepage({
               staff={itStaff}
               showEmployee={false}
             />
-            <div className="flex justify-end border-t border-[#e6edf3] px-5 py-4">
+            <div className="flex items-center justify-end gap-3 border-t border-[#e6edf3] px-5 py-4">
+              {saveError ? <p className="mr-auto text-xs text-[#9b2c2c]">{saveError}</p> : null}
               <button
                 type="submit"
                 className="rounded-md bg-[#193956] px-4 py-2 text-sm font-medium text-white hover:bg-[#385875]"
@@ -832,6 +894,15 @@ export default function Homepage({
       </AnimatePresence>
     </div>
   );
+}
+
+function initials(name: string) {
+  const letters = name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part.charAt(0).toUpperCase());
+  return letters.join("") || "?";
 }
 
 function BellIcon() {

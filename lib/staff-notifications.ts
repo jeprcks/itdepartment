@@ -7,6 +7,7 @@ export type StaffNotification = {
   message: string;
   time: string;
   actor: string;
+  unread: boolean;
 };
 
 async function connect() {
@@ -25,7 +26,7 @@ async function connect() {
 }
 
 async function notificationsFromHris(input: {
-  action: "notifications_list" | "notifications_save";
+  action: "notifications_list" | "notifications_save" | "notifications_read";
   recipient: string;
   actor: string;
   message?: string;
@@ -42,7 +43,7 @@ async function notificationsFromHris(input: {
     message: input.message ?? "",
   });
   const timestamp = String(Math.floor(Date.now() / 1000));
-  const response = await fetch(config.consumeUrl.replace(/\/consume\/?$/, "/notifications"), {
+  const response = await fetch(config.consumeUrl.replace(/\/consume\/?$/, "/projects"), {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -65,7 +66,7 @@ async function notificationsFromHris(input: {
   if (!Array.isArray(rows)) return [];
   return rows.flatMap((item) => {
     if (!item || typeof item !== "object") return [];
-    const row = item as { id?: unknown; message?: unknown; time?: unknown; actor?: unknown };
+    const row = item as { id?: unknown; message?: unknown; time?: unknown; actor?: unknown; unread?: unknown };
     const message = typeof row.message === "string" ? row.message : "";
     if (!message) return [];
     return [{
@@ -73,6 +74,7 @@ async function notificationsFromHris(input: {
       message,
       time: typeof row.time === "string" ? row.time : "",
       actor: typeof row.actor === "string" ? row.actor : "",
+      unread: row.unread !== false,
     }];
   });
 }
@@ -85,9 +87,11 @@ async function ensureTable(connection: mysql.Connection) {
       actor VARCHAR(120) NOT NULL,
       message VARCHAR(500) NOT NULL,
       created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      read_at DATETIME NULL,
       INDEX idx_recipient (recipient)
     )`,
   );
+  await connection.query(`ALTER TABLE project_staff_notifications ADD COLUMN read_at DATETIME NULL`).catch(() => undefined);
 }
 
 export async function saveStaffNotification(input: {
@@ -122,18 +126,19 @@ export async function listStaffNotifications(recipient: string): Promise<StaffNo
   try {
     await ensureTable(connection);
     const [rows] = await connection.query(
-      `SELECT id, actor, message, created_at
+      `SELECT id, actor, message, created_at, read_at
        FROM project_staff_notifications
        WHERE recipient = ? AND LOWER(actor) <> LOWER(?)
        ORDER BY id DESC
        LIMIT 50`,
       [name, name],
     );
-    return (rows as { id: number; actor: string; message: string; created_at: Date | string }[]).map(
+    return (rows as { id: number; actor: string; message: string; created_at: Date | string; read_at: Date | string | null }[]).map(
       (row) => ({
         id: Number(row.id),
         actor: row.actor,
         message: row.message,
+        unread: row.read_at == null,
         time: new Date(row.created_at).toLocaleString("en-US", {
           month: "short",
           day: "numeric",
@@ -141,6 +146,25 @@ export async function listStaffNotifications(recipient: string): Promise<StaffNo
           minute: "2-digit",
         }),
       }),
+    );
+  } finally {
+    await connection.end();
+  }
+}
+
+export async function markStaffNotificationsRead(recipient: string) {
+  const name = recipient.trim();
+  if (!name) return;
+  const connection = await connect().catch(() => null);
+  if (!connection) {
+    await notificationsFromHris({ action: "notifications_read", recipient: name, actor: name });
+    return;
+  }
+  try {
+    await ensureTable(connection);
+    await connection.query(
+      `UPDATE project_staff_notifications SET read_at = NOW() WHERE recipient = ? AND read_at IS NULL`,
+      [name],
     );
   } finally {
     await connection.end();

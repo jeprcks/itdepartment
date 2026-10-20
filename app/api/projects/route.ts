@@ -1,5 +1,17 @@
-import { listProjects, saveProject, type StoredProject } from "@/lib/projects.ts";
+import { deleteProject, listProjects, saveProject, type StoredProject } from "@/lib/projects.ts";
 import { getSession } from "@/lib/sso/session.ts";
+
+function safeHttpUrl(value: unknown) {
+  const raw = typeof value === "string" ? value.trim() : "";
+  if (!raw) return "";
+  try {
+    const url = new URL(raw);
+    if (url.protocol === "https:" || url.protocol === "http:") return url.toString();
+  } catch {
+    return "";
+  }
+  return "";
+}
 
 function clean(body: unknown): StoredProject | null {
   if (!body || typeof body !== "object") return null;
@@ -15,8 +27,8 @@ function clean(body: unknown): StoredProject | null {
     id,
     name,
     projectName,
-    projectLink: typeof row.projectLink === "string" ? row.projectLink.trim() : "",
-    trelloLink: typeof row.trelloLink === "string" ? row.trelloLink.trim() : "",
+    projectLink: safeHttpUrl(row.projectLink),
+    trelloLink: safeHttpUrl(row.trelloLink),
     status: typeof row.status === "string" ? row.status : "Not started",
     progress: Math.min(100, Math.max(0, Number(row.progress) || 0)),
     deadline,
@@ -37,7 +49,18 @@ export async function GET() {
 export async function POST(request: Request) {
   const session = await getSession();
   if (!session) return Response.json({ error: "Not signed in" }, { status: 401 });
-  const body = (await request.json().catch(() => null)) as { project?: unknown } | null;
+  const body = (await request.json().catch(() => null)) as { project?: unknown; id?: unknown } | null;
+  if (typeof body?.id === "string" && !body.project) {
+    if (!/^[0-9a-f-]{36}$/i.test(body.id)) {
+      return Response.json({ error: "Invalid project" }, { status: 400 });
+    }
+    try {
+      const projects = await deleteProject(body.id);
+      return Response.json({ projects });
+    } catch {
+      return Response.json({ error: "Project was not deleted" }, { status: 502 });
+    }
+  }
   const project = clean(body?.project);
   if (!project) return Response.json({ error: "Invalid project" }, { status: 400 });
   try {

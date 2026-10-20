@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence } from "motion/react";
 import Modal from "@/components/modal";
-import { readHistory, type HistoryEntry } from "@/lib/history.ts";
+import type { HistoryEntry } from "@/lib/history.ts";
 
 function describeLog(entry: HistoryEntry) {
   const who = entry.actor || "Someone";
@@ -14,9 +14,12 @@ function describeLog(entry: HistoryEntry) {
   if (entry.action === "Removed" && person) {
     return `${who} removed ${person} from the IT staff on this project.`;
   }
+  if (entry.action === "Deleted") {
+    return `${who} deleted this project.`;
+  }
   if (entry.action === "Added") {
     const status = entry.detail ? ` Starting point: ${entry.detail}.` : "";
-    return `${who} added this project while signed in.${status}`;
+    return `${who} added this project. The signed-in account is the owner.${status}`;
   }
   if (entry.action === "Note added") {
     return `${who} added a note: ${entry.detail || "—"}.`;
@@ -46,7 +49,18 @@ export default function HistoryPage() {
   const [selected, setSelected] = useState<HistoryEntry | null>(null);
 
   useEffect(() => {
-    setEntries(readHistory());
+    let active = true;
+    fetch("/api/logs")
+      .then((response) => (response.ok ? response.json() : { logs: [] }))
+      .then((body: { logs?: HistoryEntry[] }) => {
+        if (active) setEntries(body.logs ?? []);
+      })
+      .catch(() => {
+        if (active) setEntries([]);
+      });
+    return () => {
+      active = false;
+    };
   }, []);
 
   useEffect(() => {

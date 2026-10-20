@@ -1,4 +1,4 @@
-import { listStaffNotifications, saveStaffNotification } from "@/lib/staff-notifications.ts";
+import { listStaffNotifications, markStaffNotificationsRead, saveStaffNotification } from "@/lib/staff-notifications.ts";
 import { getSession } from "@/lib/sso/session.ts";
 
 export async function GET() {
@@ -15,6 +15,10 @@ export async function POST(request: Request) {
     recipient?: unknown;
     message?: unknown;
   } | null;
+  if (body && (body as { read?: unknown }).read === true) {
+    await markStaffNotificationsRead(session.name);
+    return Response.json({ ok: true });
+  }
   const recipient = typeof body?.recipient === "string" ? body.recipient : "";
   const message = typeof body?.message === "string" ? body.message : "";
   if (!recipient || !message) {

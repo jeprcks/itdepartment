@@ -82,15 +82,19 @@ async function connect() {
   });
 }
 
-async function projectsFromHris(project?: StoredProject): Promise<StoredProject[] | null> {
+async function projectsFromHris(
+  action: "projects_list" | "projects_save" | "projects_delete" = "projects_list",
+  extra: { project?: StoredProject; id?: string } = {},
+): Promise<StoredProject[] | null> {
   const config = readHandshakeConfig();
   if (!config) return null;
   const nonce = randomBytes(16).toString("hex");
   const raw = JSON.stringify({
-    action: project ? "projects_save" : "projects_list",
+    action,
     audience: "project_management",
     nonce,
-    project,
+    project: extra.project,
+    id: extra.id,
   });
   const timestamp = String(Math.floor(Date.now() / 1000));
   const response = await fetch(config.consumeUrl.replace(/\/consume\/?$/, "/projects"), {
@@ -140,7 +144,7 @@ export async function listProjects(): Promise<StoredProject[]> {
 export async function saveProject(project: StoredProject): Promise<StoredProject[]> {
   const connection = await connect().catch(() => null);
   if (!connection) {
-    const saved = await projectsFromHris(project);
+    const saved = await projectsFromHris("projects_save", { project });
     if (!saved) throw new Error("Project was not saved");
     return saved;
   }
@@ -174,6 +178,27 @@ export async function saveProject(project: StoredProject): Promise<StoredProject
         JSON.stringify(project.assignees),
       ],
     );
+    const [rows] = await connection.query(
+      `SELECT id, owner_name, project_name, project_link, trello_link, status, progress, deadline, notes, assignees
+       FROM it_department_projects ORDER BY updated_at DESC`,
+    );
+    return (rows as Parameters<typeof mapRow>[0][]).map(mapRow);
+  } finally {
+    await connection.end();
+  }
+}
+
+export async function deleteProject(id: string): Promise<StoredProject[]> {
+  if (!/^[0-9a-f-]{36}$/i.test(id)) throw new Error("Invalid project");
+  const connection = await connect().catch(() => null);
+  if (!connection) {
+    const saved = await projectsFromHris("projects_delete", { id });
+    if (!saved) throw new Error("Project was not deleted");
+    return saved;
+  }
+  try {
+    await connection.query(tableSql);
+    await connection.query(`DELETE FROM it_department_projects WHERE id = ?`, [id]);
     const [rows] = await connection.query(
       `SELECT id, owner_name, project_name, project_link, trello_link, status, progress, deadline, notes, assignees
        FROM it_department_projects ORDER BY updated_at DESC`,
