@@ -1,6 +1,6 @@
-import Link from "next/link";
 import { getSession } from "@/lib/sso/session.ts";
 import { hrmsDashboardUrl } from "@/lib/sso/handshake.ts";
+import SidebarNav from "@/components/sidebar-nav";
 
 const ACCESS_LABELS = {
   super_admin: "Super Admin",
@@ -12,61 +12,53 @@ export default async function Sidebar() {
   const profile = await getSession();
   if (!profile) return null;
   const hrms = hrmsDashboardUrl();
-  const subtitle = [profile.position || formatLabel(profile.accountType), ACCESS_LABELS[profile.access]]
+  const role = profile.position || formatLabel(profile.accountType);
+  const access = ACCESS_LABELS[profile.access];
+  const badge = role.trim().toLowerCase() === access.trim().toLowerCase() ? access : role;
+  const initials = profile.name
+    .split(/\s+/)
     .filter(Boolean)
-    .join(" \u00b7 ");
+    .slice(0, 2)
+    .map((part) => part.charAt(0).toUpperCase())
+    .join("");
+
   return (
-    <aside className="flex h-dvh w-56 shrink-0 flex-col bg-[#193956] font-sans text-[#F5F7FA]">
-      <div className="flex items-center gap-2 px-3 py-3">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white text-[10px] font-extrabold tracking-tight text-[#1d4e89]">
-          WISE
-        </div>
-        <div className="min-w-0">
-          <p className="text-xs font-semibold leading-tight text-[#F5F7FA]">
+    <aside className="flex h-dvh w-[260px] shrink-0 flex-col overflow-hidden bg-[linear-gradient(180deg,#1a3a5c_0%,#16324f_100%)] font-sans text-white shadow-[4px_0_18px_rgba(15,37,64,0.08)]">
+      <div className="flex min-h-[68px] shrink-0 items-center gap-2.5 border-b border-white/8 px-3.5 py-3">
+        <img
+          src="/wise-logo-sidebar.jpg"
+          alt="WISE Immigration and Study Services"
+          className="h-[38px] w-[38px] shrink-0 rounded-[9px] bg-white object-contain shadow-[0_0_0_2px_rgba(255,255,255,0.12)]"
+        />
+        <div className="min-w-0 flex-1">
+          <p className="text-[0.74rem] leading-tight font-bold text-white">
             WISE Immigration & Study Services
           </p>
-          <p className="mt-0.5 text-[10px] font-semibold leading-tight tracking-[0.04em] text-[#F0B429]">
-            IT PROJECT MANAGEMENT
-          </p>
+          <span className="mt-1 inline-block rounded-full border border-[#c9973a]/35 bg-[#c9973a]/18 px-2 py-px text-[0.58rem] font-bold tracking-[0.6px] text-[#f3d9a6] uppercase">
+            {badge}
+          </span>
         </div>
       </div>
 
-      <div className="border-t border-[rgba(255,255,255,0.12)]" />
+      <SidebarNav />
 
-      <nav className="flex flex-col gap-0.5 px-2 py-2" aria-label="Main">
-        <Link
-          href="/"
-          className="flex items-center gap-2 rounded-lg py-2 pr-2 pl-3 text-sm font-medium text-[#F5F7FA] transition-colors hover:bg-[#446586]"
-        >
-          Dashboard
-        </Link>
-        <Link
-          href="/logs"
-          className="flex items-center gap-2 rounded-lg py-2 pr-2 pl-3 text-sm font-medium text-[#F5F7FA] transition-colors hover:bg-[#446586]"
-        >
-          Logs
-        </Link>
-      </nav>
-
-      <div className="mt-auto border-t border-[rgba(255,255,255,0.12)] px-3 py-3">
+      <div className="shrink-0 bg-black/12 px-3 py-2.5">
         {hrms ? (
           <a
             href={hrms}
-            className="mb-3 flex items-center justify-center gap-1.5 rounded-lg border border-[rgba(255,255,255,0.25)] px-2 py-2 text-xs font-medium text-[#F5F7FA] transition-colors hover:bg-[#446586]"
+            className="mb-2 flex items-center gap-[11px] rounded-lg px-2.5 py-2 text-[0.835rem] font-medium text-white/80 hover:bg-white/7 hover:text-white"
           >
-            <BackIcon />
-            Back to HRMS Dashboard
+            <i className="bi bi-arrow-left-circle w-5 text-center text-base opacity-90" />
+            <span className="truncate">Back to HRMS Dashboard</span>
           </a>
         ) : null}
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#d7dee6] text-[#6d7c8c]">
-            <PersonIcon />
+        <div className="flex items-center gap-2.5">
+          <div className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-full bg-[#c9973a] text-xs font-bold text-white shadow-[0_0_0_2px_rgba(255,255,255,0.15)]">
+            {initials || "?"}
           </div>
           <div className="min-w-0 flex-1">
-            <p className="truncate text-[13px] font-semibold tracking-wide text-[#F5F7FA] uppercase">
-              {profile.name}
-            </p>
-            <p className="truncate text-xs text-[#AFC0D0]">{subtitle}</p>
+            <p className="truncate text-[0.8rem] font-semibold text-white capitalize">{profile.name.toLowerCase()}</p>
+            <p className="truncate text-[0.68rem] text-white/50">{access}</p>
           </div>
         </div>
       </div>
@@ -80,40 +72,4 @@ function formatLabel(value: string) {
     .filter(Boolean)
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ");
-}
-
-function PersonIcon() {
-  return (
-    <svg
-      aria-hidden="true"
-      viewBox="0 0 24 24"
-      className="h-5 w-5"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.75"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <circle cx="12" cy="8" r="3.25" />
-      <path d="M5.5 19.25c1.35-2.85 3.55-4.25 6.5-4.25s5.15 1.4 6.5 4.25" />
-    </svg>
-  );
-}
-
-function BackIcon() {
-  return (
-    <svg
-      aria-hidden="true"
-      viewBox="0 0 24 24"
-      className="h-[18px] w-[18px]"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.75"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M15 18l-6-6 6-6" />
-      <path d="M9 12h12" />
-    </svg>
-  );
 }

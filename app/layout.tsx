@@ -26,11 +26,17 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
+      <head>
+        <link
+          rel="stylesheet"
+          href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"
+        />
+      </head>
       <body className="flex h-full min-h-full">
         <SidebarFrame>
           <Suspense
             fallback={
-              <aside className="h-dvh w-56 shrink-0 bg-[#193956]" />
+              <aside className="h-dvh w-[260px] shrink-0 bg-[#1a3a5c]" />
             }
           >
             <Sidebar />
