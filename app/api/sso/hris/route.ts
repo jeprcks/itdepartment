@@ -1,8 +1,17 @@
-import { consumeHrisToken, readHandshakeConfig, safeNextPath } from "../../../../lib/sso/handshake.ts";
+import {
+  consumeHrisToken,
+  issueSessionCookie,
+  readHandshakeConfig,
+  readSessionSeconds,
+  readSessionSecret,
+  resolveAccess,
+  safeNextPath,
+} from "../../../../lib/sso/handshake.ts";
 
 export async function POST(request: Request) {
   const config = readHandshakeConfig();
-  if (!config) {
+  const sessionSecret = readSessionSecret();
+  if (!config || !sessionSecret) {
     return Response.json({ error: "Authentication failed" }, { status: 401 });
   }
 
@@ -25,12 +34,33 @@ export async function POST(request: Request) {
     return Response.json({ error: "Authentication failed" }, { status: 401 });
   }
 
+  const access = resolveAccess(result.claims);
+  if (!access) {
+    console.info("hris sso denied", { reason: "not-it-department", uid: result.claims.hrmsUserId });
+    return new Response(null, {
+      status: 303,
+      headers: {
+        Location: "/access-denied",
+        "Set-Cookie": `it_pm_session=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax`,
+        "Cache-Control": "no-store",
+      },
+    });
+  }
+
+  const cookie = issueSessionCookie(
+    sessionSecret,
+    result.claims,
+    access,
+    Math.floor(Date.now() / 1000),
+    process.env.NODE_ENV === "production",
+    readSessionSeconds(),
+  );
   const destination = safeNextPath(next, config.allowedPaths);
   return new Response(null, {
     status: 303,
     headers: {
       Location: destination,
-      "Set-Cookie": serializeCookie(result.cookie),
+      "Set-Cookie": serializeCookie(cookie),
       "Cache-Control": "no-store",
     },
   });
@@ -39,9 +69,7 @@ export async function POST(request: Request) {
 function serializeCookie(cookie: {
   name: string;
   value: string;
-  httpOnly: boolean;
   secure: boolean;
-  sameSite: "lax";
   path: string;
   maxAge: number;
 }) {

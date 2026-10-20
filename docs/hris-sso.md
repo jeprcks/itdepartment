@@ -1,37 +1,36 @@
 # HRIS SSO
 
-HRIS remains the identity provider. A logged-in HRMS user opens Project Management from the HRMS nav. HRMS posts a one-time `token` to `POST /api/sso/hris`. This app sends that token to `HRIS_SSO_CONSUME_URL` as JSON `{ token, nonce, audience: "project_management" }`, signed as HMAC-SHA256 over `timestamp + "." + raw JSON body` in `X-SSO-Timestamp` and `X-SSO-Signature`. The HRMS response is verified the same way. A matching nonce and audience create an HttpOnly session cookie.
+HRMS (Wise-HRMS) is the only identity provider. There is no local login and no logout button.
 
-The launch stays hidden in HRMS until `PROJECT_MANAGEMENT_SSO_URL`, `PROJECT_MANAGEMENT_SSO_SECRET`, `PROJECT_MANAGEMENT_SSO_AUDIENCE=project_management`, and `PROJECT_MANAGEMENT_SSO_ALLOWED_HOST` are set on the HRMS server. Use a new secret. Do not reuse the Inventory secret, the IT Support secret, or `APP_SECRET`.
+## Flow
 
-This has not been tested against the live HRMS.
+1. A logged-in HRMS user clicks **Project Management** in the HRMS nav (`POST /sso/project-management/launch`).
+2. HRMS issues a one-time token (SHA-256 hash stored in `sso_handshake_tokens`, TTL 15-120 s) and auto-posts it to `POST /api/sso/hris` here.
+3. This app calls `HRIS_SSO_CONSUME_URL` (`/api/sso/project-management/consume`) with `{ token, nonce, audience: "project_management" }`, HMAC-SHA256 signed over `timestamp + "." + body` (`X-SSO-Timestamp`, `X-SSO-Signature`) with `HRIS_SSO_SECRET` (= HRMS `PROJECT_MANAGEMENT_SSO_SECRET`). The HRMS reply is verified the same way, plus nonce and audience.
+4. HRMS returns `hrms_user_id, employee_number, email, display_name, hrms_role, position_title, department_code, department_name, is_active`.
+5. `lib/sso/access.ts` maps the user to an access level, or denies (redirect to `/access-denied`, no cookie).
+6. Allowed users get an HttpOnly `it_pm_session` cookie signed with `IT_PM_SESSION_SECRET` (different from the HMAC secret), lifetime `IT_PM_SESSION_MAX_AGE_SECONDS` (default 7200 = 2 h). No instant revocation: changes in HRMS apply at next launch.
 
-`HRIS_SSO_TEST_MODE=true` runs only when `NODE_ENV` is not `production`. The test signer in `lib/sso/adapter.ts` is a local harness. It is not the HRIS protocol. A previously exposed `APP_SECRET` must not be used.
+`proxy.ts` checks the cookie (signature + expiry) on every page and API route except `/api/sso/hris` and `/access-denied`. Pages also call `requireSession()`. Missing/expired session: pages redirect to `HRIS_DASHBOARD_URL`, APIs return 401.
 
-The in-memory nonce set and session map exist for tests. They are not shared storage and must be replaced before any real login.
+## Access levels
 
-## Missing HRIS details
+| Level | Who | Rights |
+| --- | --- | --- |
+| `super_admin` | HRMS role `super_admin` | everything |
+| `president` | HRMS role `president`, or position title in `IT_PM_PRESIDENT_POSITIONS` (default `President`) | CRUD on all projects |
+| `it_staff` | department code in `IT_PM_IT_DEPARTMENT_CODES` (default `IT`) or name in `IT_PM_IT_DEPARTMENT_NAMES` | CRUD only on projects they own or are assigned to |
+| denied | everyone else | `/access-denied` page with link back to HRMS |
 
-- SSO initiation endpoint.
-- Callback URL and HTTP method.
-- Required headers and payload.
-- Exact canonical message used for signing.
-- Signature encoding.
-- Timestamp tolerance and replay-protection requirements.
-- Employee identity fields.
-- Expected issuer and audience.
-- Session and logout behavior.
+Projects are still client-side (localStorage/seed data). Ownership checks (`canEditProject`) currently run in the UI only; server-side enforcement needs a server project store (pending decision).
 
-## Environment variables
+## Environment variables (set on the server, never commit values)
 
-Set these on the server. Do not commit values.
-
-- `HRIS_SSO_ENABLED`
-- `HRIS_SSO_PROTOCOL` (`unconfirmed` until the contract is validated)
-- `HRIS_SSO_TEST_MODE` (never `true` in production)
-- `HRIS_SSO_ISSUER`
-- `HRIS_SSO_AUDIENCE`
-- `HRIS_SSO_SECRET`
-- `HRIS_SSO_MAX_AGE_SECONDS`
-
-Share `HRIS_SSO_SECRET` with HRIS through the host's secret store, separately from this repository.
+- `HRIS_SSO_ENABLED` (`true` to allow logins)
+- `HRIS_SSO_SECRET` (shared with HRMS, >= 32 chars)
+- `HRIS_SSO_CONSUME_URL`
+- `HRIS_SSO_ALLOWED_PATHS`
+- `HRIS_DASHBOARD_URL` (sidebar "Back to HRMS Dashboard" + sign-in redirect)
+- `IT_PM_SESSION_SECRET` (>= 32 chars, must differ from `HRIS_SSO_SECRET`)
+- `IT_PM_SESSION_MAX_AGE_SECONDS` (default 7200, clamped 300-28800)
+- `IT_PM_PRESIDENT_POSITIONS`, `IT_PM_IT_DEPARTMENT_CODES`, `IT_PM_IT_DEPARTMENT_NAMES` (comma lists)

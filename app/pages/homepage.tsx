@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
+import { recordHistory } from "@/lib/history.ts";
+import { canEditProject, type AccessLevel } from "@/lib/sso/access.ts";
 
 type ProjectForm = {
   name: string;
@@ -94,7 +96,7 @@ const deadlineFormat = new Intl.DateTimeFormat("en-US", {
   timeZone: "UTC",
 });
 
-export default function Homepage() {
+export default function Homepage({ viewer }: { viewer: { name: string; access: AccessLevel } }) {
   const [selected, setSelected] = useState<(typeof projects)[number] | null>(
     null,
   );
@@ -116,20 +118,12 @@ export default function Homepage() {
   >([]);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
 
+  const canEdit = (project: Project) =>
+    canEditProject(viewer, { owner: project.name, assignees: assignedBy[project.id] ?? [] });
+
   function notify(message: string) {
-    setNotifications((current) => [
-      {
-        id: crypto.randomUUID(),
-        message,
-        time: new Date().toLocaleString("en-US", {
-          month: "short",
-          day: "numeric",
-          hour: "numeric",
-          minute: "2-digit",
-        }),
-      },
-      ...current,
-    ]);
+    const entry = recordHistory(message);
+    setNotifications((current) => [entry, ...current]);
   }
 
   function notifyAssignmentChange(
@@ -146,6 +140,8 @@ export default function Homepage() {
   }
 
   function toggleDeveloper(projectId: string, developer: string) {
+    const target = projectRows.find((project) => project.id === projectId);
+    if (!target || !canEdit(target)) return;
     const projectLabel =
       projectRows.find((project) => project.id === projectId)?.projectName ??
       "a project";
@@ -175,7 +171,7 @@ export default function Homepage() {
   function addProject(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const projectName = addForm.projectName.trim();
-    const name = addForm.name.trim();
+    const name = viewer.access === "it_staff" ? viewer.name : addForm.name.trim();
     if (!projectName || !name || !addForm.deadline) return;
 
     const progress = Math.min(100, Math.max(0, Number(addForm.progress) || 0));
@@ -219,6 +215,8 @@ export default function Homepage() {
   function saveEdit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!editingId) return;
+    const editing = projectRows.find((project) => project.id === editingId);
+    if (!editing || !canEdit(editing)) return;
     const projectName = editForm.projectName.trim();
     const name = editForm.name.trim();
     if (!projectName || !name || !editForm.deadline) return;
@@ -393,6 +391,7 @@ export default function Homepage() {
                       <button
                         type="button"
                         aria-haspopup="listbox"
+                        disabled={!canEdit(project)}
                         aria-expanded={openAssign === project.id}
                         onClick={() =>
                           setOpenAssign((current) =>
@@ -492,6 +491,7 @@ export default function Homepage() {
                       </button>
                       <button
                         type="button"
+                        hidden={!canEdit(project)}
                         onClick={() => openEdit(project)}
                         className="text-xs font-medium text-[#1d4e89] underline decoration-[#1d4e89]/30 underline-offset-2 hover:decoration-[#1d4e89]"
                       >

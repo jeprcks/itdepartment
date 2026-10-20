@@ -1,6 +1,20 @@
 import Link from "next/link";
+import { getSession } from "@/lib/sso/session.ts";
+import { hrmsDashboardUrl } from "@/lib/sso/handshake.ts";
 
-export default function Sidebar() {
+const ACCESS_LABELS = {
+  super_admin: "Super Admin",
+  president: "President",
+  it_staff: "IT Staff",
+} as const;
+
+export default async function Sidebar() {
+  const profile = await getSession();
+  if (!profile) return null;
+  const hrms = hrmsDashboardUrl();
+  const subtitle = [profile.position || formatLabel(profile.accountType), ACCESS_LABELS[profile.access]]
+    .filter(Boolean)
+    .join(" \u00b7 ");
   return (
     <aside className="sticky top-0 flex h-dvh w-[22.5rem] shrink-0 flex-col bg-[#193956] font-sans text-[#F5F7FA]">
       <div className="flex items-center gap-3 px-4 py-5">
@@ -19,62 +33,53 @@ export default function Sidebar() {
 
       <div className="border-t border-[rgba(255,255,255,0.12)]" />
 
-      <nav className="px-3 py-4" aria-label="Main">
+      <nav className="flex flex-col gap-1 px-3 py-4" aria-label="Main">
         <Link
           href="/"
-          aria-current="page"
-          className="relative flex items-center gap-3 overflow-hidden rounded-lg bg-[#385875] py-2.5 pr-3 pl-4 text-sm font-medium text-[#F5F7FA] transition-colors hover:bg-[#446586]"
+          className="flex items-center gap-3 rounded-lg py-2.5 pr-3 pl-4 text-sm font-medium text-[#F5F7FA] transition-colors hover:bg-[#446586]"
         >
-          <span
-            aria-hidden="true"
-            className="absolute inset-y-0 left-0 w-[3px] bg-[#F0B429]"
-          />
-          <GaugeIcon />
           Dashboard
+        </Link>
+        <Link
+          href="/history"
+          className="flex items-center gap-3 rounded-lg py-2.5 pr-3 pl-4 text-sm font-medium text-[#F5F7FA] transition-colors hover:bg-[#446586]"
+        >
+          History
         </Link>
       </nav>
 
       <div className="mt-auto border-t border-[rgba(255,255,255,0.12)] px-4 py-4">
+        {hrms ? (
+          <a
+            href={hrms}
+            className="mb-4 flex items-center justify-center gap-2 rounded-lg border border-[rgba(255,255,255,0.25)] py-2.5 text-sm font-medium text-[#F5F7FA] transition-colors hover:bg-[#446586]"
+          >
+            <BackIcon />
+            Back to HRMS Dashboard
+          </a>
+        ) : null}
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#d7dee6] text-[#6d7c8c]">
             <PersonIcon />
           </div>
           <div className="min-w-0 flex-1">
             <p className="truncate text-[13px] font-semibold tracking-wide text-[#F5F7FA] uppercase">
-              Arley Flores
+              {profile.name}
             </p>
-            <p className="truncate text-xs text-[#AFC0D0]">IT Officer</p>
+            <p className="truncate text-xs text-[#AFC0D0]">{subtitle}</p>
           </div>
-          <button
-            type="button"
-            aria-label="Log out"
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-[#F5F7FA] transition-colors hover:bg-white/10"
-          >
-            <LogoutIcon />
-          </button>
         </div>
       </div>
     </aside>
   );
 }
 
-function GaugeIcon() {
-  return (
-    <svg
-      aria-hidden="true"
-      viewBox="0 0 24 24"
-      className="h-[18px] w-[18px]"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.75"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M4.75 15.25a7.25 7.25 0 1 1 14.5 0" />
-      <path d="M12 15.25 16.1 10.2" />
-      <circle cx="12" cy="15.25" r="1" fill="currentColor" stroke="none" />
-    </svg>
-  );
+function formatLabel(value: string) {
+  return value
+    .split(/[_\s]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
 }
 
 function PersonIcon() {
@@ -95,7 +100,7 @@ function PersonIcon() {
   );
 }
 
-function LogoutIcon() {
+function BackIcon() {
   return (
     <svg
       aria-hidden="true"
@@ -107,9 +112,8 @@ function LogoutIcon() {
       strokeLinecap="round"
       strokeLinejoin="round"
     >
-      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-      <path d="M16 17l5-5-5-5" />
-      <path d="M21 12H9" />
+      <path d="M15 18l-6-6 6-6" />
+      <path d="M9 12h12" />
     </svg>
   );
 }
