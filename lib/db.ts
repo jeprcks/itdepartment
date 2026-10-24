@@ -21,6 +21,7 @@ export const LOGS_TABLE_SQL = `CREATE TABLE IF NOT EXISTS it_department_logs (
   actor VARCHAR(160) NOT NULL,
   action VARCHAR(40) NOT NULL,
   project_name VARCHAR(200) NOT NULL DEFAULT '',
+  project_id VARCHAR(64) NULL DEFAULT NULL,
   employee_name VARCHAR(160) NOT NULL DEFAULT '',
   detail TEXT NOT NULL,
   message VARCHAR(500) NOT NULL,
@@ -57,6 +58,22 @@ export async function ensureSchema(connection: mysql.Connection) {
   );
   if (Number((cols as { n: number }[])[0]?.n ?? 0) === 0) {
     await connection.query("ALTER TABLE it_department_projects ADD COLUMN archived TINYINT NOT NULL DEFAULT 0");
+  }
+  const [logCols] = await connection.query(
+    `SELECT COUNT(*) AS n FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'it_department_logs' AND COLUMN_NAME = 'project_id'`,
+  );
+  if (Number((logCols as { n: number }[])[0]?.n ?? 0) === 0) {
+    await connection.query(
+      "ALTER TABLE it_department_logs ADD COLUMN project_id VARCHAR(64) NULL DEFAULT NULL AFTER project_name",
+    );
+  }
+  const [logIdx] = await connection.query(
+    `SELECT COUNT(*) AS n FROM information_schema.STATISTICS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'it_department_logs' AND INDEX_NAME = 'idx_logs_project_id'`,
+  );
+  if (Number((logIdx as { n: number }[])[0]?.n ?? 0) === 0) {
+    await connection.query("ALTER TABLE it_department_logs ADD INDEX idx_logs_project_id (project_id)");
   }
   ensured = true;
 }

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { authorizeProjectChange, authorizeProjectSave } from "../lib/project-access.ts";
 import { toCsv } from "../lib/csv.ts";
-import { filterLogs } from "../lib/log-filters.ts";
+import { filterLogs, logsForProject } from "../lib/log-filters.ts";
 
 const admin = { name: "Root Admin", access: "super_admin" as const };
 const president = { name: "The President", access: "president" as const };
@@ -57,4 +57,18 @@ test("log filters: project, person, action, date range", () => {
   assert.equal(filterLogs(logs, { action: "Assigned" }).length, 1);
   assert.equal(filterLogs(logs, { from: "2026-10-02", to: "2026-10-09" }).length, 2);
   assert.equal(filterLogs(logs, { to: "2026-10-01" }).length, 1);
+});
+
+test("project activity: match by ID, fall back to name only for rows without ID", () => {
+  const id = "11111111-1111-1111-1111-111111111111";
+  const logs = [
+    { project: "Old Name", projectId: id },
+    { project: "New Name", projectId: id },
+    { project: "New Name", projectId: "" },
+    { project: "new name", projectId: "22222222-2222-2222-2222-222222222222" },
+    { project: "Other", projectId: "" },
+  ];
+  assert.equal(logsForProject(logs, id, "New Name").length, 3);
+  assert.equal(logsForProject(logs, "", "New Name").length, 3);
+  assert.equal(logsForProject(logs, "", "").length, 5);
 });

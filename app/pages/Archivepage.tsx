@@ -52,6 +52,7 @@ export default function ArchivePage({ viewerName }: { viewerName: string }) {
         body: JSON.stringify({
           action: "Restored",
           project: project.projectName,
+          projectId: project.id,
           employee: project.name,
           detail: "Reopened from the archive",
           message: `${viewerName} reopened ${project.projectName}.`,

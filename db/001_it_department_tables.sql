@@ -23,8 +23,10 @@ CREATE TABLE IF NOT EXISTS it_department_logs (
   actor VARCHAR(160) NOT NULL,
   action VARCHAR(40) NOT NULL,
   project_name VARCHAR(200) NOT NULL DEFAULT '',
+  project_id VARCHAR(64) NULL DEFAULT NULL,
   employee_name VARCHAR(160) NOT NULL DEFAULT '',
   detail TEXT NOT NULL,
   message VARCHAR(500) NOT NULL,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_logs_project_id (project_id)
 );

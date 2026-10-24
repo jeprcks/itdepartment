@@ -1,4 +1,5 @@
 import { listActivityLogs, saveActivityLog } from "@/lib/activity-logs.ts";
+import { logsForProject } from "@/lib/log-filters.ts";
 import { getSession } from "@/lib/sso/session.ts";
 
 const ACTIONS = new Set([
@@ -17,9 +18,9 @@ const ACTIONS = new Set([
 export async function GET(request: Request) {
   const session = await getSession();
   if (!session) return Response.json({ error: "Not signed in" }, { status: 401 });
-  const project = new URL(request.url).searchParams.get("project")?.trim().toLowerCase() ?? "";
+  const params = new URL(request.url).searchParams;
   const all = await listActivityLogs();
-  const logs = project ? all.filter((log) => log.project.trim().toLowerCase() === project) : all;
+  const logs = logsForProject(all, params.get("projectId") ?? "", params.get("project") ?? "");
   return Response.json({ logs });
 }
 
@@ -29,6 +30,7 @@ export async function POST(request: Request) {
   const body = (await request.json().catch(() => null)) as {
     action?: unknown;
     project?: unknown;
+    projectId?: unknown;
     employee?: unknown;
     detail?: unknown;
     message?: unknown;
@@ -42,6 +44,8 @@ export async function POST(request: Request) {
     actor: session.name,
     action,
     project: typeof body?.project === "string" ? body.project.trim() : "",
+    projectId:
+      typeof body?.projectId === "string" && /^[0-9a-f-]{36}$/i.test(body.projectId) ? body.projectId : "",
     employee: typeof body?.employee === "string" ? body.employee.trim() : "",
     detail: typeof body?.detail === "string" ? body.detail.trim() : "",
     message,

@@ -10,6 +10,8 @@ export type ActivityLog = {
   actor: string;
   action: string;
   project: string;
+  /** it_department_projects.id; empty for old rows / HRMS-written rows. */
+  projectId: string;
   employee: string;
   detail: string;
 };
@@ -19,6 +21,7 @@ function mapRow(row: {
   actor: string;
   action: string;
   project_name: string;
+  project_id?: string | null;
   employee_name: string;
   detail: string;
   message: string;
@@ -30,6 +33,7 @@ function mapRow(row: {
     actor: row.actor,
     action: row.action,
     project: row.project_name,
+    projectId: row.project_id ?? "",
     employee: row.employee_name,
     detail: row.detail,
     message: row.message,
@@ -78,7 +82,7 @@ async function logsFromHris(entry?: Omit<ActivityLog, "id" | "time" | "at">): Pr
         if (!item || typeof item !== "object") return [];
         const row = item as ActivityLog;
         if (!row.id || !row.message) return [];
-        return [row];
+        return [{ ...row, projectId: typeof row.projectId === "string" ? row.projectId : "" }];
       })
     : [];
 }
@@ -89,7 +93,7 @@ export const LOG_LIMIT = 2000;
 export async function listActivityLogs(): Promise<ActivityLog[]> {
   const fromDb = await withDb(async (connection) => {
     const [rows] = await connection.query(
-      `SELECT id, actor, action, project_name, employee_name, detail, message, created_at
+      `SELECT id, actor, action, project_name, project_id, employee_name, detail, message, created_at
        FROM it_department_logs ORDER BY created_at DESC LIMIT ${LOG_LIMIT}`,
     );
     return (rows as Parameters<typeof mapRow>[0][]).map(mapRow);
@@ -100,13 +104,14 @@ export async function listActivityLogs(): Promise<ActivityLog[]> {
 export async function saveActivityLog(entry: Omit<ActivityLog, "id" | "time" | "at">): Promise<void> {
   const saved = await withDb(async (connection) => {
     await connection.query(
-      `INSERT INTO it_department_logs (id, actor, action, project_name, employee_name, detail, message, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`,
+      `INSERT INTO it_department_logs (id, actor, action, project_name, project_id, employee_name, detail, message, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
       [
         randomBytes(16).toString("hex"),
         entry.actor.slice(0, 160),
         entry.action.slice(0, 40),
         entry.project.slice(0, 200),
+        /^[0-9a-f-]{36}$/i.test(entry.projectId) ? entry.projectId : null,
         entry.employee.slice(0, 160),
         entry.detail.slice(0, 2000),
         entry.message.slice(0, 500),

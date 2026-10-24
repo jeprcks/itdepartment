@@ -18,3 +18,22 @@ export function filterLogs<T extends LogLike>(logs: T[], filters: LogFilters): T
     return true;
   });
 }
+
+/**
+ * Logs for one project: rows linked by project_id, plus legacy rows without an ID
+ * whose name matches the project's current name. With no ID given, filters by name only.
+ */
+export function logsForProject<T extends { project: string; projectId?: string }>(
+  logs: T[],
+  projectId: string,
+  projectName: string,
+): T[] {
+  const id = projectId.trim().toLowerCase();
+  const name = projectName.trim().toLowerCase();
+  if (!id && !name) return logs;
+  return logs.filter((log) => {
+    const logId = (log.projectId ?? "").trim().toLowerCase();
+    if (id && logId) return logId === id;
+    return name !== "" && log.project.trim().toLowerCase() === name;
+  });
+}

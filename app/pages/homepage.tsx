@@ -148,6 +148,7 @@ export default function Homepage({
   function notify(input: {
     action: string;
     project: string;
+    projectId?: string;
     employee?: string;
     detail?: string;
     message: string;
@@ -158,6 +159,7 @@ export default function Homepage({
       body: JSON.stringify({
         action: input.action,
         project: input.project,
+        projectId: input.projectId ?? "",
         employee: input.employee ?? "",
         detail: input.detail ?? "",
         message: input.message,
@@ -178,6 +180,7 @@ export default function Homepage({
   }
 
   function notifyAssignmentChange(
+    projectId: string,
     projectLabel: string,
     previous: string[],
     next: string[],
@@ -186,6 +189,7 @@ export default function Homepage({
       notify({
         action: "Assigned",
         project: projectLabel,
+        projectId,
         employee: name,
         detail: `${name} was assigned`,
         message: `${name} was assigned as IT staff on ${projectLabel}.`,
@@ -195,6 +199,7 @@ export default function Homepage({
       notify({
         action: "Removed",
         project: projectLabel,
+        projectId,
         employee: name,
         detail: `${name} was removed`,
         message: `${name} was removed from the IT staff on ${projectLabel}.`,
@@ -220,6 +225,7 @@ export default function Homepage({
     notify({
       action: "Archived",
       project: project.projectName,
+      projectId: project.id,
       employee: project.name,
       detail: "Moved to the archive",
       message: `${viewer.name} archived ${project.projectName}.`,
@@ -245,7 +251,7 @@ export default function Homepage({
   useEffect(() => {
     if (!selected || modalTab !== "activity") return;
     let active = true;
-    fetch(`/api/logs?project=${encodeURIComponent(selected.projectName)}`)
+    fetch(`/api/logs?projectId=${encodeURIComponent(selected.id)}&project=${encodeURIComponent(selected.projectName)}`)
       .then((response) => (response.ok ? response.json() : { logs: [] }))
       .then((body: { logs?: ActivityLog[] }) => {
         if (active) setProjectLogs(body.logs ?? []);
@@ -309,11 +315,12 @@ export default function Homepage({
     notify({
       action: "Added",
       project: project.projectName,
+      projectId: project.id,
       employee: project.name,
       detail: `${project.status}, ${project.progress}% progress`,
       message: `${viewer.name} added ${project.projectName}.`,
     });
-    notifyAssignmentChange(project.projectName, [], addForm.assignees);
+    notifyAssignmentChange(project.id, project.projectName, [], addForm.assignees);
     setAddForm(emptyForm);
     setAdding(false);
     });
@@ -368,6 +375,7 @@ export default function Homepage({
       notify({
         action: "Status changed",
         project: projectName,
+        projectId: editingId,
         employee: name,
         detail: `${previousStatus} to ${editForm.status}`,
         message: `${projectName} status changed to ${editForm.status}.`,
@@ -384,6 +392,7 @@ export default function Homepage({
       notify({
         action: "Updated",
         project: projectName,
+        projectId: editingId,
         employee: name,
         detail: changed.join(", "),
         message: `${projectName} was updated.`,
@@ -393,12 +402,13 @@ export default function Homepage({
       notify({
         action: previous.notes ? "Note updated" : "Note added",
         project: projectName,
+        projectId: editingId,
         employee: name,
         detail: nextNotes || "Note removed",
         message: `Note changed on ${projectName}.`,
       });
     }
-    notifyAssignmentChange(projectName, previousAssignees, editForm.assignees);
+    notifyAssignmentChange(editingId, projectName, previousAssignees, editForm.assignees);
     setEditingId(null);
     });
   }
@@ -724,7 +734,7 @@ export default function Homepage({
         <Modal
           labelledBy="project-links-title"
           onClose={() => setSelected(null)}
-          className="w-full max-w-3xl max-h-[90dvh] overflow-y-auto rounded-2xl border border-[#d7e0ea] bg-white shadow-2xl"
+          className="w-full max-w-lg rounded-2xl border border-[#d7e0ea] bg-white shadow-2xl"
         >
             <header className="flex items-start justify-between gap-4 border-b border-[#e6edf3] px-6 py-5">
               <div>
