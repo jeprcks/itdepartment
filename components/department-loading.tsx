@@ -6,7 +6,7 @@ export default function DepartmentLoading() {
           <span className="absolute inset-0 animate-spin rounded-full border-2 border-[#d7e0ea] border-t-[#c9973a]" />
           <span className="absolute inset-[7px] rounded-full bg-[#1a3a5c]" />
         </div>
-        <p className="text-sm font-medium text-[#193956]">Opening IT Department</p>
+        <p className="text-sm font-medium text-[#193956]">Loading IT Department projects…</p>
       </div>
     </div>
   );

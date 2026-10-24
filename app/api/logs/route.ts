@@ -14,10 +14,12 @@ const ACTIONS = new Set([
   "Restored",
 ]);
 
-export async function GET() {
+export async function GET(request: Request) {
   const session = await getSession();
   if (!session) return Response.json({ error: "Not signed in" }, { status: 401 });
-  const logs = await listActivityLogs();
+  const project = new URL(request.url).searchParams.get("project")?.trim().toLowerCase() ?? "";
+  const all = await listActivityLogs();
+  const logs = project ? all.filter((log) => log.project.trim().toLowerCase() === project) : all;
   return Response.json({ logs });
 }
 

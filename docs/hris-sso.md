@@ -26,7 +26,13 @@ itdepartment accepts every user HRMS authenticates:
 | `it_staff` | everyone else HRMS lets through | CRUD only on projects they own or are assigned to |
 
 `IT_PM_IT_DEPARTMENT_CODES` / `IT_PM_IT_DEPARTMENT_NAMES` are no longer used. `/access-denied` is only shown as a sign-in fallback when `HRIS_DASHBOARD_URL` is not set.
-Projects are still client-side (localStorage/seed data). Ownership checks (`canEditProject`) currently run in the UI only; server-side enforcement needs a server project store (pending decision).
+## Project storage and server-side ownership
+
+Projects and activity logs live in MySQL (`DB_*` in `.env`, the HRMS database, e.g. `wise_hris`) in `it_department_projects` and `it_department_logs`, the same tables the HRMS `/api/sso/project-management/projects` endpoint uses. itdepartment connects directly with `mysql2` (`lib/db.ts`); if the DB is not configured or unreachable it falls back to the signed HRMS endpoint.
+
+- Schema: `db/001_it_department_tables.sql` (idempotent). Run `npm run db:migrate`; the app also creates missing tables/columns on first use. Nothing is ever dropped.
+- `app/api/projects` enforces ownership on the server (`lib/project-access.ts`) using the session from `lib/sso`: `super_admin`/`president` full CRUD; `it_staff` can create only as owner and edit/archive/reopen only projects they own or are assigned to (checked against the stored row). Denied requests return 403.
+- No localStorage is used.
 
 ## Environment variables (set on the server, never commit values)
 

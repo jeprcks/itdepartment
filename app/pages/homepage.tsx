@@ -5,6 +5,8 @@ import { AnimatePresence, motion } from "motion/react";
 import DepartmentLoading from "@/components/department-loading";
 import PageHeader from "@/components/page-header";
 import Modal from "@/components/modal";
+import { Pagination, SortHeader, compareValues, nextSort, type SortState } from "@/components/table-controls";
+import type { ActivityLog } from "@/lib/activity-logs.ts";
 import { canAnnounceNotes, canEditProject, type AccessLevel } from "@/lib/sso/access.ts";
 
 type ProjectForm = {
@@ -45,6 +47,8 @@ type Project = {
 
 type ItStaff = { id: number; name: string; title: string };
 
+type SortKey = "name" | "projectName" | "status" | "progress" | "deadline";
+
 const statusStyles: Record<string, string> = {
   "In Progress": "bg-[#e8f1fb] text-[#1d4e89]",
   "Under Review": "bg-[#fff6df] text-[#8a5b00]",
@@ -60,8 +64,10 @@ const deadlineFormat = new Intl.DateTimeFormat("en-US", {
 
 export default function Homepage({
   viewer,
+  hrmsUrl = "",
 }: {
   viewer: { name: string; access: AccessLevel; position: string };
+  hrmsUrl?: string;
 }) {
   const [selected, setSelected] = useState<Project | null>(null);
   const [assignedBy, setAssignedBy] = useState<Record<string, string[]>>({});
@@ -80,6 +86,12 @@ export default function Homepage({
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [itStaff, setItStaff] = useState<ItStaff[]>([]);
   const [booting, setBooting] = useState(true);
+  const [sort, setSort] = useState<SortState<SortKey>>({ key: "deadline", dir: "asc" });
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [actionError, setActionError] = useState("");
+  const [modalTab, setModalTab] = useState<"details" | "activity">("details");
+  const [projectLogs, setProjectLogs] = useState<ActivityLog[] | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -198,7 +210,11 @@ export default function Homepage({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id: project.id }),
     });
-    if (!response.ok) return;
+    if (!response.ok) {
+      setActionError(await readError(response, "Couldn't archive the project. Try again."));
+      return;
+    }
+    setActionError("");
     const body = (await response.json()) as { projects?: (Project & { assignees?: string[] })[] };
     applyProjects(body.projects ?? []);
     notify({
@@ -216,10 +232,41 @@ export default function Homepage({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ project: { ...project, assignees } }),
     });
-    if (!response.ok) return false;
+    if (!response.ok) {
+      setSaveError(await readError(response, "Couldn't save the project. Check your connection and try again."));
+      return false;
+    }
+    setSaveError("");
     const body = (await response.json()) as { projects?: (Project & { assignees?: string[] })[] };
     applyProjects(body.projects ?? []);
     return true;
+  }
+
+  useEffect(() => {
+    if (!selected || modalTab !== "activity") return;
+    let active = true;
+    fetch(`/api/logs?project=${encodeURIComponent(selected.projectName)}`)
+      .then((response) => (response.ok ? response.json() : { logs: [] }))
+      .then((body: { logs?: ActivityLog[] }) => {
+        if (active) setProjectLogs(body.logs ?? []);
+      })
+      .catch(() => {
+        if (active) setProjectLogs([]);
+      });
+    return () => {
+      active = false;
+    };
+  }, [selected, modalTab]);
+
+  function openDetails(project: Project) {
+    setModalTab("details");
+    setProjectLogs(null);
+    setSelected(project);
+  }
+
+  async function readError(response: Response, fallback: string) {
+    const body = (await response.json().catch(() => null)) as { error?: string } | null;
+    return body?.error || fallback;
   }
 
   useEffect(() => {
@@ -258,10 +305,7 @@ export default function Homepage({
 
     setSaveError("");
     void persist(project, addForm.assignees).then((saved) => {
-      if (!saved) {
-        setSaveError("The project was not saved. Check the HRIS connection and try again.");
-        return;
-      }
+      if (!saved) return;
     notify({
       action: "Added",
       project: project.projectName,
@@ -276,6 +320,7 @@ export default function Homepage({
   }
 
   function openEdit(project: Project) {
+    setSaveError("");
     setEditingId(project.id);
     setEditForm({
       name: project.name,
@@ -374,8 +419,21 @@ export default function Homepage({
       assignees.some((name) => name.toLowerCase().includes(searchText))
     );
   });
+  const sortedRows = [...visibleRows].sort((a, b) => {
+    const pick = (project: Project): string | number =>
+      sort.key === "status" ? statuses[project.id] ?? project.status : project[sort.key];
+    const result = compareValues(pick(a), pick(b));
+    return sort.dir === "asc" ? result : -result;
+  });
+  const pageCount = Math.max(1, Math.ceil(sortedRows.length / pageSize));
+  const currentPage = Math.min(page, pageCount);
+  const pagedRows = sortedRows.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const onSort = (key: SortKey) => {
+    setSort((current) => nextSort(current, key));
+    setPage(1);
+  };
   const summaryCards = [
-    { label: "All projects", value: "All", count: projectRows.length },
+    { label: "Total projects", value: "All", count: projectRows.length },
     ...Object.keys(statusStyles).map((status) => ({
       label: status,
       value: status,
@@ -392,9 +450,22 @@ export default function Homepage({
         </div>
       ) : null}
       <PageHeader
-        title="Project monitoring"
-        description="See who owns each project, who is assigned, and what is due."
+        title="Projects dashboard"
+        description="Track every IT project at a glance: owner, assigned staff, progress, and deadline. Click a row to see its details."
       >
+        <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+        {hrmsUrl ? (
+          <a
+            href={hrmsUrl}
+            aria-label="Back to HRMS Dashboard"
+            title="Back to HRMS Dashboard"
+            className="inline-flex h-10 items-center gap-2 rounded-full border border-[#d7e0ea] bg-white px-3 text-sm font-semibold text-[#193956] shadow-sm transition hover:-translate-y-0.5 hover:border-[#193956] hover:bg-[#f5f9fd] focus-visible:ring-2 focus-visible:ring-[#1d4e89]/40 focus-visible:outline-none sm:px-4"
+          >
+            <i className="bi bi-arrow-left-circle text-base" aria-hidden="true" />
+            <span className="hidden sm:inline">Back to HRMS Dashboard</span>
+            <span className="sm:hidden">HRMS</span>
+          </a>
+        ) : null}
         <button
           type="button"
           aria-label="Notifications"
@@ -417,6 +488,7 @@ export default function Homepage({
             </span>
           ) : null}
         </button>
+        </div>
       </PageHeader>
       <div
         className="mb-5 grid shrink-0 grid-cols-2 gap-3 lg:grid-cols-5"
@@ -430,11 +502,14 @@ export default function Homepage({
               key={card.value}
               type="button"
               aria-pressed={active}
-              onClick={() => setStatusFilter(card.value)}
+              onClick={() => {
+                setStatusFilter(card.value);
+                setPage(1);
+              }}
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.22, delay: index * 0.04 }}
-              className={`rounded-2xl border px-4 py-4 text-left shadow-sm transition ${
+              className={`rounded-xl border px-4 py-3.5 text-left shadow-sm transition ${
                 active
                   ? "border-[#193956] bg-[#193956] text-white"
                   : "border-[#d7e0ea] bg-white text-[#193956] hover:-translate-y-0.5 hover:border-[#385875]"
@@ -453,60 +528,50 @@ export default function Homepage({
         })}
       </div>
       <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-[#d7e0ea] bg-white shadow-sm">
-        <header className="flex shrink-0 items-center justify-between gap-3 border-b border-[#e6edf3] px-5 py-4">
-          <div>
+        <header className="flex shrink-0 flex-wrap items-center gap-3 border-b border-[#e6edf3] px-5 py-4">
+          <div className="mr-auto">
             <h2 className="text-sm font-bold tracking-tight text-[#193956]">Projects</h2>
             <p className="mt-0.5 text-xs text-[#5c6b7a]">
-              {visibleRows.length} shown
+              Showing {visibleRows.length} of {projectRows.length}
             </p>
+            {actionError ? <p role="alert" className="mt-1 text-xs text-[#9b2c2c]">{actionError}</p> : null}
           </div>
           <input
             value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search project, owner, or staff"
+            onChange={(event) => {
+              setSearch(event.target.value);
+              setPage(1);
+            }}
+            placeholder="Search by project, owner, or staff"
             aria-label="Search projects"
-            className="h-10 w-full max-w-xs rounded-lg border border-[#d7e0ea] px-3 text-sm text-[#193956] outline-none focus:border-[#1d4e89]"
+            className="h-10 w-full max-w-xs flex-1 rounded-lg border border-[#d7e0ea] bg-[#f8fafc] px-3 text-sm text-[#193956] outline-none transition placeholder:text-[#8aa0b3] focus:border-[#1d4e89] focus:bg-white focus:ring-2 focus:ring-[#1d4e89]/15"
           />
+          <a
+            href="/api/export/projects"
+            download
+            className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-lg border border-[#d7e0ea] bg-white px-3 text-xs font-semibold text-[#385875] transition hover:border-[#385875] hover:bg-[#eef3f8]"
+          >
+            <i className="bi bi-download" aria-hidden="true" />
+            Export CSV
+          </a>
         </header>
         <div className="min-h-0 flex-1 overflow-auto">
           <table className="w-full min-w-[980px] border-collapse text-left text-sm">
-            <thead className="sticky top-0 z-10 bg-[#193956] text-[#F5F7FA]">
+            <thead className="sticky top-0 z-10 border-b border-[#e6edf3] bg-[#f8fafc] text-[#5c6b7a]">
               <tr>
+                <SortHeader label="Owner" sortKey="name" sort={sort} onSort={onSort} className="sticky left-0 bg-[#f8fafc]" />
+                <SortHeader label="Project" sortKey="projectName" sort={sort} onSort={onSort} />
+                <th scope="col" className="px-5 py-3 font-medium whitespace-nowrap">
+                  IT staff
+                </th>
+                <SortHeader label="Status" sortKey="status" sort={sort} onSort={onSort} />
+                <SortHeader label="Progress" sortKey="progress" sort={sort} onSort={onSort} />
+                <SortHeader label="Deadline" sortKey="deadline" sort={sort} onSort={onSort} />
                 <th
                   scope="col"
-                  className="sticky left-0 bg-[#193956] px-5 py-3 font-medium whitespace-nowrap"
+                  className="px-5 py-3 text-right font-medium whitespace-nowrap"
                 >
-                  Employee
-                </th>
-                <th scope="col" className="px-5 py-3 font-medium">
-                  Project
-                </th>
-                <th
-                  scope="col"
-                  className="px-5 py-3 font-medium whitespace-nowrap"
-                >
-                  Assigned IT Staff
-                </th>
-                <th
-                  scope="col"
-                  className="px-5 py-3 font-medium whitespace-nowrap"
-                >
-                  Status
-                </th>
-                <th scope="col" className="px-5 py-3 font-medium">
-                  Progress
-                </th>
-                <th
-                  scope="col"
-                  className="px-5 py-3 font-medium whitespace-nowrap"
-                >
-                  Deadline
-                </th>
-                <th
-                  scope="col"
-                  className="px-5 py-3 font-medium whitespace-nowrap"
-                >
-                  Actions
+                  <span className="sr-only">Actions</span>
                 </th>
               </tr>
             </thead>
@@ -515,22 +580,42 @@ export default function Homepage({
                 <tr>
                   <td
                     colSpan={7}
-                    className="px-5 py-16 text-center text-sm text-[#5c6b7a]"
+                    className="px-5 py-20 text-center"
                   >
-                    {projectRows.length === 0
-                      ? "No projects yet. Use Add project to create the first one."
-                      : searchText
-                        ? "Nothing matches this search."
-                        : "Nothing matches this status."}
+                    <div className="mx-auto flex max-w-sm flex-col items-center gap-2">
+                      <span className="flex h-11 w-11 items-center justify-center rounded-full bg-[#eef3f8] text-[#385875]">
+                        <i className={`bi ${projectRows.length === 0 ? "bi-folder-plus" : "bi-search"} text-lg`} aria-hidden="true" />
+                      </span>
+                      <p className="text-sm font-semibold text-[#193956]">
+                        {projectRows.length === 0 ? "No projects yet" : "No matching projects"}
+                      </p>
+                      <p className="text-xs leading-5 text-[#5c6b7a]">
+                        {projectRows.length === 0
+                          ? "Click New project to add the first one."
+                          : searchText
+                            ? "Try a different project, owner, or staff name."
+                            : "No projects have this status right now."}
+                      </p>
+                    </div>
                   </td>
                 </tr>
               ) : null}
-              {visibleRows.map((project) => (
+              {pagedRows.map((project) => (
                 <tr
                   key={project.id}
-                  className="group border-t border-[#e6edf3] text-[#193956]"
+                  tabIndex={0}
+                  aria-label={`View details for ${project.projectName}`}
+                  onClick={() => openDetails(project)}
+                  onKeyDown={(event) => {
+                    if (event.target !== event.currentTarget) return;
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      openDetails(project);
+                    }
+                  }}
+                  className="group cursor-pointer border-t border-[#eef2f6] text-[#193956] outline-none transition-colors focus-visible:bg-[#f1f6fb] focus-visible:ring-2 focus-visible:ring-[#1d4e89]/40 focus-visible:ring-inset"
                 >
-                  <td className="sticky left-0 bg-white px-5 py-3.5 align-top whitespace-nowrap group-hover:bg-[#f7fafc]">
+                  <td className="sticky left-0 bg-white px-5 py-3.5 align-top whitespace-nowrap group-hover:bg-[#f5f9fd] group-focus-visible:bg-[#f1f6fb]">
                     <span className="flex items-center gap-2.5">
                       <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#c9973a] text-[11px] font-bold text-white shadow-[0_0_0_2px_rgba(201,151,58,0.25)]">
                         {initials(project.name)}
@@ -538,10 +623,10 @@ export default function Homepage({
                       {project.name}
                     </span>
                   </td>
-                  <td className="px-5 py-3.5 align-top font-medium group-hover:bg-[#f7fafc]">
+                  <td className="px-5 py-3.5 align-top font-medium group-hover:bg-[#f5f9fd] group-focus-visible:bg-[#f1f6fb]">
                     {project.projectName}
                   </td>
-                  <td className="px-5 py-3.5 align-top text-[#5c6b7a] group-hover:bg-[#f7fafc]">
+                  <td className="px-5 py-3.5 align-top text-[#5c6b7a] group-hover:bg-[#f5f9fd] group-focus-visible:bg-[#f1f6fb]">
                     {(assignedBy[project.id] ?? []).length > 0 ? (
                       <ul className="space-y-1">
                         {assignedBy[project.id].map((name) => (
@@ -551,17 +636,17 @@ export default function Homepage({
                         ))}
                       </ul>
                     ) : (
-                      "No IT staff assigned"
+                      <span className="text-[#8aa0b3] italic">Unassigned</span>
                     )}
                   </td>
-                  <td className="px-5 py-3.5 align-top whitespace-nowrap group-hover:bg-[#f7fafc]">
+                  <td className="px-5 py-3.5 align-top whitespace-nowrap group-hover:bg-[#f5f9fd] group-focus-visible:bg-[#f1f6fb]">
                     <span
                       className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${statusStyles[statuses[project.id]] ?? "bg-[#fff6df] text-[#8a5b00]"}`}
                     >
                       {statuses[project.id]}
                     </span>
                   </td>
-                  <td className="px-5 py-3.5 align-top group-hover:bg-[#f7fafc]">
+                  <td className="px-5 py-3.5 align-top group-hover:bg-[#f5f9fd] group-focus-visible:bg-[#f1f6fb]">
                     <div className="flex min-w-36 items-center gap-3">
                       <div
                         className="h-1.5 flex-1 overflow-hidden rounded-full bg-[#e6edf3]"
@@ -579,17 +664,21 @@ export default function Homepage({
                       </span>
                     </div>
                   </td>
-                  <td className="px-5 py-3.5 align-top whitespace-nowrap text-[#5c6b7a] group-hover:bg-[#f7fafc]">
+                  <td className="px-5 py-3.5 align-top whitespace-nowrap text-[#5c6b7a] group-hover:bg-[#f5f9fd] group-focus-visible:bg-[#f1f6fb]">
                     <time dateTime={project.deadline}>
                       {deadlineFormat.format(new Date(project.deadline))}
                     </time>
                   </td>
-                  <td className="px-5 py-3.5 align-top whitespace-nowrap group-hover:bg-[#f7fafc]">
-                    <div className="flex items-center gap-3">
+                  <td className="px-5 py-3.5 align-top whitespace-nowrap group-hover:bg-[#f5f9fd] group-focus-visible:bg-[#f1f6fb]">
+                    <div
+                      className="flex items-center justify-end gap-1"
+                      onClick={(event) => event.stopPropagation()}
+                      onKeyDown={(event) => event.stopPropagation()}
+                    >
                       <button
                         type="button"
-                        onClick={() => setSelected(project)}
-                        className="text-xs font-medium text-[#1d4e89] underline decoration-[#1d4e89]/30 underline-offset-2 hover:decoration-[#1d4e89]"
+                        onClick={() => openDetails(project)}
+                        className="rounded-md px-2 py-1 text-xs font-semibold text-[#1d4e89] transition hover:bg-[#e8f1fb]"
                       >
                         View
                       </button>
@@ -597,7 +686,7 @@ export default function Homepage({
                         type="button"
                         hidden={!canEdit(project)}
                         onClick={() => openEdit(project)}
-                        className="text-xs font-medium text-[#1d4e89] underline decoration-[#1d4e89]/30 underline-offset-2 hover:decoration-[#1d4e89]"
+                        className="rounded-md px-2 py-1 text-xs font-semibold text-[#385875] transition hover:bg-[#eef3f8]"
                       >
                         Edit
                       </button>
@@ -605,7 +694,7 @@ export default function Homepage({
                         type="button"
                         hidden={!canEdit(project)}
                         onClick={() => void removeProject(project)}
-                        className="text-xs font-medium text-[#9b2c2c] underline decoration-[#9b2c2c]/30 underline-offset-2 hover:decoration-[#9b2c2c]"
+                        className="rounded-md px-2 py-1 text-xs font-semibold text-[#9b2c2c] transition hover:bg-[#fdecec]"
                       >
                         Archive
                       </button>
@@ -616,6 +705,18 @@ export default function Homepage({
             </tbody>
           </table>
         </div>
+        {sortedRows.length > 0 ? (
+          <Pagination
+            page={currentPage}
+            pageSize={pageSize}
+            total={sortedRows.length}
+            onPage={setPage}
+            onPageSize={(size) => {
+              setPageSize(size);
+              setPage(1);
+            }}
+          />
+        ) : null}
       </section>
 
       <AnimatePresence>
@@ -637,7 +738,7 @@ export default function Homepage({
                   {selected.projectName}
                 </h2>
                 <p className="mt-2 text-sm text-[#5c6b7a]">
-                  {statuses[selected.id]} · Due {deadlineFormat.format(new Date(selected.deadline))}
+                  {statuses[selected.id]} · {selected.progress}% complete · Due {deadlineFormat.format(new Date(selected.deadline))}
                 </p>
               </div>
               <button
@@ -649,7 +750,58 @@ export default function Homepage({
                 Close
               </button>
             </header>
-            <div className="flex flex-col gap-5 px-6 py-5">
+            <div role="tablist" aria-label="Project sections" className="flex gap-1 border-b border-[#e6edf3] px-6">
+              {(["details", "activity"] as const).map((tab) => (
+                <button
+                  key={tab}
+                  type="button"
+                  role="tab"
+                  aria-selected={modalTab === tab}
+                  onClick={() => setModalTab(tab)}
+                  className={`-mb-px border-b-2 px-3 py-2.5 text-sm font-semibold capitalize transition ${
+                    modalTab === tab
+                      ? "border-[#c9973a] text-[#193956]"
+                      : "border-transparent text-[#8aa0b3] hover:text-[#385875]"
+                  }`}
+                >
+                  {tab}
+                </button>
+              ))}
+            </div>
+            {modalTab === "activity" ? (
+              <div role="tabpanel" className="max-h-[50vh] overflow-y-auto px-6 py-5">
+                {projectLogs === null ? (
+                  <p className="text-sm text-[#5c6b7a]">Loading activity…</p>
+                ) : projectLogs.length === 0 ? (
+                  <p className="py-6 text-center text-sm text-[#5c6b7a]">No activity recorded for this project yet.</p>
+                ) : (
+                  <ol className="relative flex flex-col gap-4 border-l border-[#e6edf3] pl-4">
+                    {projectLogs.map((log) => (
+                      <li key={log.id} className="relative">
+                        <span className="absolute top-1.5 -left-[21px] h-2.5 w-2.5 rounded-full border-2 border-white bg-[#c9973a]" aria-hidden="true" />
+                        <p className="text-sm text-[#193956]">
+                          <span className="font-semibold">{log.action}</span>
+                          {log.detail ? ` · ${log.detail}` : ""}
+                        </p>
+                        <p className="mt-0.5 text-xs text-[#5c6b7a]">
+                          <time dateTime={log.at}>{log.time}</time>
+                          {log.actor ? ` · by ${log.actor}` : ""}
+                        </p>
+                      </li>
+                    ))}
+                  </ol>
+                )}
+              </div>
+            ) : (
+            <div role="tabpanel" className="flex flex-col gap-5 px-6 py-5">
+              <div>
+                <p className="text-xs font-medium text-[#5c6b7a]">Assigned IT staff</p>
+                <p className="mt-1.5 text-sm text-[#193956]">
+                  {(assignedBy[selected.id] ?? []).length > 0
+                    ? assignedBy[selected.id].join(", ")
+                    : "No IT staff assigned yet."}
+                </p>
+              </div>
               <div>
                 <p className="text-xs font-medium text-[#5c6b7a]">Website</p>
                 {selected.projectLink.startsWith("http://") || selected.projectLink.startsWith("https://") ? (
@@ -662,7 +814,7 @@ export default function Homepage({
                     {selected.projectLink}
                   </a>
                 ) : (
-                  <p className="mt-1.5 text-sm text-[#8aa0b3]">No website yet.</p>
+                  <p className="mt-1.5 text-sm text-[#8aa0b3]">No website link added.</p>
                 )}
               </div>
               <div>
@@ -677,16 +829,17 @@ export default function Homepage({
                     {selected.trelloLink}
                   </a>
                 ) : (
-                  <p className="mt-1.5 text-sm text-[#8aa0b3]">No Trello board yet.</p>
+                  <p className="mt-1.5 text-sm text-[#8aa0b3]">No Trello board linked.</p>
                 )}
               </div>
               <div className="rounded-xl bg-[#f4f7fb] px-4 py-3">
                 <p className="text-xs font-medium text-[#5c6b7a]">Notes</p>
                 <p className="mt-1.5 text-sm leading-6 whitespace-pre-wrap text-[#193956]">
-                  {selected.notes || "No notes yet."}
+                  {selected.notes || "No notes for this project."}
                 </p>
               </div>
             </div>
+            )}
         </Modal>
       ) : null}
 
@@ -713,7 +866,7 @@ export default function Homepage({
             </header>
             <div className="overflow-y-auto px-5 py-4">
               {visibleNotifications.length === 0 ? (
-                <p className="text-sm text-[#5c6b7a]">No notifications yet.</p>
+                <p className="py-8 text-center text-sm text-[#5c6b7a]">You&apos;re all caught up. New updates will appear here.</p>
               ) : (
                 <ul className="flex flex-col gap-3">
                   {visibleNotifications.map((item) => (
@@ -738,13 +891,13 @@ export default function Homepage({
       <button
         type="button"
         onClick={() => setAdding(true)}
-        aria-label="Add project"
+        aria-label="New project"
         className="fixed right-7 bottom-7 z-40 flex h-12 items-center gap-2 rounded-full bg-[#193956] px-5 text-sm font-medium text-white shadow-lg transition hover:-translate-y-0.5 hover:bg-[#385875]"
       >
         <span aria-hidden="true" className="text-xl leading-none">
           +
         </span>
-        Add project
+        New project
       </button>
 
       <AnimatePresence>
@@ -764,6 +917,7 @@ export default function Homepage({
               >
                 Edit project
               </h2>
+              <p className="mt-0.5 text-xs text-[#5c6b7a]">Changes are logged and shared with assigned staff.</p>
             </header>
             <ProjectFields form={editForm} onChange={setEditForm} includeLinks staff={itStaff} />
             <div className="flex justify-end gap-2 border-t border-[#e6edf3] px-5 py-4">
@@ -772,13 +926,14 @@ export default function Homepage({
                 onClick={() => setEditingId(null)}
                 className="rounded-md px-4 py-2 text-sm font-medium text-[#5c6b7a] hover:bg-[#f5f7fa] hover:text-[#193956]"
               >
-                Close
+                Cancel
               </button>
+              {saveError ? <p role="alert" className="order-first mr-auto text-xs text-[#9b2c2c]">{saveError}</p> : null}
               <button
                 type="submit"
-                className="rounded-md bg-[#193956] px-4 py-2 text-sm font-medium text-white hover:bg-[#385875]"
+                className="rounded-lg bg-[#193956] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[#385875]"
               >
-                Save
+                Save changes
               </button>
             </div>
           </form>
@@ -799,7 +954,7 @@ export default function Homepage({
                 id="add-project-title"
                 className="text-lg font-semibold text-[#193956]"
               >
-                Add project
+                New project
               </h2>
               <button
                 type="button"
@@ -820,9 +975,9 @@ export default function Homepage({
               {saveError ? <p className="mr-auto text-xs text-[#9b2c2c]">{saveError}</p> : null}
               <button
                 type="submit"
-                className="rounded-md bg-[#193956] px-4 py-2 text-sm font-medium text-white hover:bg-[#385875]"
+                className="rounded-lg bg-[#193956] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[#385875]"
               >
-                Add project
+                Create project
               </button>
             </div>
           </form>
@@ -881,14 +1036,14 @@ function ProjectFields({
     <div className="grid gap-4 px-6 py-5">
       {showEmployee ? (
         <label className="grid gap-1 text-xs font-medium text-[#5c6b7a]">
-          Employee
+          Owner
           <select
             required
             value={form.name}
             onChange={(event) => onChange({ ...form, name: event.target.value })}
             className={fieldClass}
           >
-            <option value="">Select IT employee</option>
+            <option value="">Select the project owner</option>
             {staff.map((person) => (
               <option key={person.id} value={person.name}>
                 {person.name}
@@ -899,9 +1054,10 @@ function ProjectFields({
         </label>
       ) : null}
       <label className="grid gap-1 text-xs font-medium text-[#5c6b7a]">
-        Project
+        Project name
         <input
           required
+          placeholder="e.g. HRMS payroll module"
           value={form.projectName}
           onChange={(event) =>
             onChange({ ...form, projectName: event.target.value })
@@ -911,7 +1067,7 @@ function ProjectFields({
       </label>
       <div className="grid gap-1">
         <span className="text-xs font-medium text-[#5c6b7a]">
-          Assigned IT Staff
+          Assigned IT staff
         </span>
         <div className="relative">
           <button
@@ -919,7 +1075,7 @@ function ProjectFields({
             aria-haspopup="listbox"
             aria-expanded={staffOpen}
             onClick={() => setStaffOpen((open) => !open)}
-            className="flex h-9 w-full items-center justify-between rounded-md border border-[#d7e0ea] bg-white px-3 text-left text-sm text-[#193956]"
+            className="flex h-10 w-full items-center justify-between rounded-lg border border-[#d7e0ea] bg-white px-3 text-left text-sm text-[#193956]"
           >
             <span className="truncate">
               {form.assignees.length > 0
@@ -1003,7 +1159,7 @@ function ProjectFields({
         </select>
       </label>
       <label className="grid gap-1 text-xs font-medium text-[#5c6b7a]">
-        Progress
+        Progress (%)
         <input
           type="number"
           min={0}
@@ -1034,16 +1190,17 @@ function ProjectFields({
           value={form.notes}
           onChange={(event) => onChange({ ...form, notes: event.target.value })}
           rows={3}
-          placeholder="Add a note"
+          placeholder="Context, blockers, or next steps"
           className="rounded-lg border border-[#d7e0ea] px-3 py-2.5 text-sm leading-6 text-[#193956] outline-none transition focus:border-[#1d4e89] focus:ring-2 focus:ring-[#1d4e89]/15"
         />
       </label>
       {includeLinks ? (
         <>
           <label className="grid gap-1 text-xs font-medium text-[#5c6b7a]">
-            Website
+            Website link
             <input
               type="url"
+              placeholder="https://"
               value={form.projectLink}
               onChange={(event) =>
                 onChange({ ...form, projectLink: event.target.value })
@@ -1052,9 +1209,10 @@ function ProjectFields({
             />
           </label>
           <label className="grid gap-1 text-xs font-medium text-[#5c6b7a]">
-            Trello
+            Trello board link
             <input
               type="url"
+              placeholder="https://trello.com/b/..."
               value={form.trelloLink}
               onChange={(event) =>
                 onChange({ ...form, trelloLink: event.target.value })

@@ -16,8 +16,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "IT Department",
-  description: "IT Department Projects Management",
+  title: "IT Department · Project Management",
+  description: "Track IT Department projects, assignments, and activity.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

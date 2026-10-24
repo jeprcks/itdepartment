@@ -15,6 +15,7 @@ type ArchivedProject = {
 export default function ArchivePage({ viewerName }: { viewerName: string }) {
   const [projects, setProjects] = useState<ArchivedProject[]>([]);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -38,7 +39,11 @@ export default function ArchivePage({ viewerName }: { viewerName: string }) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id: project.id, restore: true }),
     });
-    if (response.ok) {
+    if (!response.ok) {
+      const body = (await response.json().catch(() => null)) as { error?: string } | null;
+      setError(body?.error || "Couldn't reopen the project. Try again.");
+    } else {
+      setError("");
       const body = (await response.json()) as { projects?: ArchivedProject[] };
       setProjects(body.projects ?? []);
       await fetch("/api/logs", {
@@ -60,34 +65,45 @@ export default function ArchivePage({ viewerName }: { viewerName: string }) {
     <div className="flex min-h-dvh flex-1 flex-col bg-[#f4f7fb] px-5 py-5 font-sans sm:px-7 sm:py-6">
       <PageHeader
         title="Archive"
-        description="Projects removed from the dashboard. Reopen one to put it back on the homepage."
+        description="Projects moved off the dashboard. Reopen a project to return it to the dashboard."
       />
       <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-[#d7e0ea] bg-white shadow-sm">
-        <header className="shrink-0 border-b border-[#e6edf3] px-5 py-4">
-          <h2 className="text-sm font-bold tracking-tight text-[#193956]">Archived projects</h2>
-          <p className="mt-0.5 text-xs text-[#5c6b7a]">{projects.length} archived</p>
+        <header className="flex shrink-0 flex-wrap items-center gap-3 border-b border-[#e6edf3] px-5 py-4">
+          <div className="mr-auto">
+            <h2 className="text-sm font-bold tracking-tight text-[#193956]">Archived projects</h2>
+            <p className="mt-0.5 text-xs text-[#5c6b7a]">{projects.length} archived</p>
+            {error ? <p role="alert" className="mt-1 text-xs text-[#9b2c2c]">{error}</p> : null}
+          </div>
+          <a
+            href="/api/export/projects?archived=1"
+            download
+            className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg border border-[#d7e0ea] bg-white px-3 text-xs font-semibold text-[#385875] transition hover:border-[#385875] hover:bg-[#eef3f8]"
+          >
+            <i className="bi bi-download" aria-hidden="true" />
+            Export CSV
+          </a>
         </header>
         <div className="min-h-0 flex-1 overflow-auto">
           <table className="w-full min-w-[760px] border-collapse text-left text-sm">
-            <thead className="sticky top-0 z-10 bg-[#193956] text-[#F5F7FA]">
+            <thead className="sticky top-0 z-10 border-b border-[#e6edf3] bg-[#f8fafc] text-[#5c6b7a]">
               <tr>
-                <th scope="col" className="px-5 py-3 font-medium">Employee</th>
+                <th scope="col" className="px-5 py-3 font-medium">Owner</th>
                 <th scope="col" className="px-5 py-3 font-medium">Project</th>
-                <th scope="col" className="px-5 py-3 font-medium">Assigned IT Staff</th>
+                <th scope="col" className="px-5 py-3 font-medium">IT staff</th>
                 <th scope="col" className="px-5 py-3 font-medium">Status</th>
-                <th scope="col" className="px-5 py-3 font-medium">Actions</th>
+                <th scope="col" className="px-5 py-3 text-right font-medium"><span className="sr-only">Actions</span></th>
               </tr>
             </thead>
             <tbody>
               {projects.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="px-5 py-16 text-center text-sm text-[#5c6b7a]">
-                    No archived projects.
+                    Nothing archived. Projects you archive from the dashboard will appear here.
                   </td>
                 </tr>
               ) : (
                 projects.map((project) => (
-                  <tr key={project.id} className="border-t border-[#e6edf3] text-[#193956]">
+                  <tr key={project.id} className="border-t border-[#eef2f6] text-[#193956] transition-colors hover:bg-[#f5f9fd]">
                     <td className="px-5 py-3.5 align-top whitespace-nowrap">{project.name}</td>
                     <td className="px-5 py-3.5 align-top font-medium">{project.projectName}</td>
                     <td className="px-5 py-3.5 align-top text-[#5c6b7a]">
@@ -100,18 +116,19 @@ export default function ArchivePage({ viewerName }: { viewerName: string }) {
                           ))}
                         </ul>
                       ) : (
-                        "No IT staff assigned"
+                        <span className="text-[#8aa0b3] italic">Unassigned</span>
                       )}
                     </td>
                     <td className="px-5 py-3.5 align-top whitespace-nowrap">{project.status}</td>
-                    <td className="px-5 py-3.5 align-top">
+                    <td className="px-5 py-3.5 text-right align-top">
                       <button
                         type="button"
                         disabled={busyId === project.id}
                         onClick={() => void reopen(project)}
-                        className="text-xs font-medium text-[#1d4e89] underline decoration-[#1d4e89]/30 underline-offset-2 hover:decoration-[#1d4e89] disabled:opacity-50"
+                        className="inline-flex items-center gap-1.5 rounded-md border border-[#d7e0ea] px-2.5 py-1 text-xs font-semibold text-[#1d4e89] transition hover:border-[#1d4e89] hover:bg-[#e8f1fb] disabled:opacity-50"
                       >
-                        Reopen
+                        <i className="bi bi-arrow-counterclockwise" aria-hidden="true" />
+                        {busyId === project.id ? "Reopening…" : "Reopen"}
                       </button>
                     </td>
                   </tr>

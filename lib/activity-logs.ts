@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import mysql from "mysql2/promise";
+import { withDb } from "@/lib/db.ts";
 import { readHandshakeConfig, readSignedJson, signTimestampBody } from "@/lib/sso/handshake.ts";
 
 export type ActivityLog = {
@@ -13,17 +13,6 @@ export type ActivityLog = {
   employee: string;
   detail: string;
 };
-
-const tableSql = `CREATE TABLE IF NOT EXISTS it_department_logs (
-  id VARCHAR(64) NOT NULL PRIMARY KEY,
-  actor VARCHAR(160) NOT NULL,
-  action VARCHAR(40) NOT NULL,
-  project_name VARCHAR(200) NOT NULL DEFAULT '',
-  employee_name VARCHAR(160) NOT NULL DEFAULT '',
-  detail TEXT NOT NULL,
-  message VARCHAR(500) NOT NULL,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-)`;
 
 function mapRow(row: {
   id: string;
@@ -52,21 +41,6 @@ function mapRow(row: {
       minute: "2-digit",
     }),
   };
-}
-
-async function connect() {
-  const host = process.env.DB_HOST;
-  const database = process.env.DB_NAME;
-  const user = process.env.DB_USER;
-  if (!host || !database || !user) return null;
-  return mysql.createConnection({
-    host,
-    port: Number(process.env.DB_PORT ?? 3306),
-    database,
-    user,
-    password: process.env.DB_PASS ?? "",
-    connectTimeout: 4000,
-  });
 }
 
 async function logsFromHris(entry?: Omit<ActivityLog, "id" | "time" | "at">): Promise<ActivityLog[] | null> {
@@ -109,36 +83,22 @@ async function logsFromHris(entry?: Omit<ActivityLog, "id" | "time" | "at">): Pr
     : [];
 }
 
+export const LOG_LIMIT = 2000;
+
+/** MySQL first (DB_* in .env); falls back to the signed HRMS endpoint (latest 200 only). */
 export async function listActivityLogs(): Promise<ActivityLog[]> {
-  if (readHandshakeConfig()) return (await logsFromHris()) ?? [];
-  const connection = await connect().catch(() => null);
-  if (!connection) return (await logsFromHris()) ?? [];
-  try {
-    await connection.query(tableSql);
+  const fromDb = await withDb(async (connection) => {
     const [rows] = await connection.query(
       `SELECT id, actor, action, project_name, employee_name, detail, message, created_at
-       FROM it_department_logs ORDER BY created_at DESC LIMIT 200`,
+       FROM it_department_logs ORDER BY created_at DESC LIMIT ${LOG_LIMIT}`,
     );
     return (rows as Parameters<typeof mapRow>[0][]).map(mapRow);
-  } finally {
-    await connection.end();
-  }
+  }).catch(() => null);
+  return fromDb ?? (await logsFromHris().catch(() => null)) ?? [];
 }
 
 export async function saveActivityLog(entry: Omit<ActivityLog, "id" | "time" | "at">): Promise<void> {
-  if (readHandshakeConfig()) {
-    const saved = await logsFromHris(entry);
-    if (!saved) throw new Error("Log was not saved");
-    return;
-  }
-  const connection = await connect().catch(() => null);
-  if (!connection) {
-    const saved = await logsFromHris(entry);
-    if (!saved) throw new Error("Log was not saved");
-    return;
-  }
-  try {
-    await connection.query(tableSql);
+  const saved = await withDb(async (connection) => {
     await connection.query(
       `INSERT INTO it_department_logs (id, actor, action, project_name, employee_name, detail, message, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`,
@@ -152,7 +112,9 @@ export async function saveActivityLog(entry: Omit<ActivityLog, "id" | "time" | "
         entry.message.slice(0, 500),
       ],
     );
-  } finally {
-    await connection.end();
-  }
+    return true;
+  }).catch(() => null);
+  if (saved) return;
+  const viaHris = await logsFromHris(entry).catch(() => null);
+  if (!viaHris) throw new Error("Log was not saved");
 }

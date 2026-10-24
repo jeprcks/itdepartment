@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence } from "motion/react";
 import Modal from "@/components/modal";
 import PageHeader from "@/components/page-header";
+import { Pagination, SortHeader, compareValues, nextSort, type SortState } from "@/components/table-controls";
+import { filterLogs, type LogFilters } from "@/lib/log-filters.ts";
 import type { HistoryEntry } from "@/lib/history.ts";
 
 function describeLog(entry: HistoryEntry) {
@@ -51,9 +53,48 @@ function noteText(entry: HistoryEntry) {
   return match?.[1]?.trim() ?? "";
 }
 
+type LogSortKey = "at" | "actor" | "project" | "action";
+
+const emptyFilters: Required<LogFilters> = { project: "", person: "", action: "", from: "", to: "" };
+
 export default function HistoryPage() {
   const [entries, setEntries] = useState<HistoryEntry[]>([]);
   const [selected, setSelected] = useState<HistoryEntry | null>(null);
+  const [filters, setFilters] = useState(emptyFilters);
+  const [sort, setSort] = useState<SortState<LogSortKey>>({ key: "at", dir: "desc" });
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+
+  const projectOptions = useMemo(
+    () => [...new Set(entries.map((entry) => entry.project).filter(Boolean))].sort(compareValues),
+    [entries],
+  );
+  const actionOptions = useMemo(
+    () => [...new Set(entries.map((entry) => entry.action).filter(Boolean))].sort(compareValues),
+    [entries],
+  );
+  const filtered = filterLogs(entries, filters);
+  const sorted = [...filtered].sort((a, b) => {
+    const result = sort.key === "at" ? compareValues(Date.parse(a.at) || 0, Date.parse(b.at) || 0) : compareValues(a[sort.key], b[sort.key]);
+    return sort.dir === "asc" ? result : -result;
+  });
+  const pageCount = Math.max(1, Math.ceil(sorted.length / pageSize));
+  const currentPage = Math.min(page, pageCount);
+  const paged = sorted.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const activeFilters = Object.values(filters).some(Boolean);
+  const exportHref = `/api/export/logs?${new URLSearchParams(
+    Object.entries(filters).filter(([, value]) => value),
+  ).toString()}`;
+  const setFilter = (key: keyof LogFilters, value: string) => {
+    setFilters((current) => ({ ...current, [key]: value }));
+    setPage(1);
+  };
+  const onSort = (key: LogSortKey) => {
+    setSort((current) => nextSort(current, key));
+    setPage(1);
+  };
+  const field =
+    "h-9 rounded-lg border border-[#d7e0ea] bg-[#f8fafc] px-2.5 text-xs text-[#193956] outline-none transition focus:border-[#1d4e89] focus:bg-white focus:ring-2 focus:ring-[#1d4e89]/15";
 
   useEffect(() => {
     let active = true;
@@ -82,44 +123,112 @@ export default function HistoryPage() {
   return (
     <div className="flex min-h-dvh flex-1 flex-col bg-[#f4f7fb] px-5 py-5 font-sans sm:px-7 sm:py-6">
       <PageHeader
-        title="Logs"
-        description="A record of who changed a project and what they changed."
+        title="Activity logs"
+        description="A complete record of who changed which project, and what changed. Click a row for details."
       />
       <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-[#d7e0ea] bg-white shadow-sm">
-        <header className="shrink-0 border-b border-[#e6edf3] px-5 py-4">
-          <h2 className="text-sm font-bold tracking-tight text-[#193956]">Activity</h2>
+        <header className="flex shrink-0 flex-wrap items-center gap-3 border-b border-[#e6edf3] px-5 py-4">
+          <div className="mr-auto">
+            <h2 className="text-sm font-bold tracking-tight text-[#193956]">Recent activity</h2>
+            <p className="mt-0.5 text-xs text-[#5c6b7a]">
+              Showing {filtered.length} of {entries.length} entries
+            </p>
+          </div>
+          <a
+            href={exportHref}
+            download
+            className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg border border-[#d7e0ea] bg-white px-3 text-xs font-semibold text-[#385875] transition hover:border-[#385875] hover:bg-[#eef3f8]"
+          >
+            <i className="bi bi-download" aria-hidden="true" />
+            Export CSV
+          </a>
         </header>
+        <div className="flex shrink-0 flex-wrap items-end gap-3 border-b border-[#e6edf3] bg-[#fbfcfe] px-5 py-3" role="search" aria-label="Filter logs">
+          <label className="grid gap-1 text-[11px] font-medium text-[#5c6b7a]">
+            Project
+            <select value={filters.project} onChange={(event) => setFilter("project", event.target.value)} className={`${field} min-w-40`}>
+              <option value="">All projects</option>
+              {projectOptions.map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="grid gap-1 text-[11px] font-medium text-[#5c6b7a]">
+            Person
+            <input
+              value={filters.person}
+              onChange={(event) => setFilter("person", event.target.value)}
+              placeholder="Changed by or employee"
+              className={`${field} w-48`}
+            />
+          </label>
+          <label className="grid gap-1 text-[11px] font-medium text-[#5c6b7a]">
+            Action
+            <select value={filters.action} onChange={(event) => setFilter("action", event.target.value)} className={`${field} min-w-36`}>
+              <option value="">All actions</option>
+              {actionOptions.map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="grid gap-1 text-[11px] font-medium text-[#5c6b7a]">
+            From
+            <input type="date" value={filters.from} max={filters.to || undefined} onChange={(event) => setFilter("from", event.target.value)} className={field} />
+          </label>
+          <label className="grid gap-1 text-[11px] font-medium text-[#5c6b7a]">
+            To
+            <input type="date" value={filters.to} min={filters.from || undefined} onChange={(event) => setFilter("to", event.target.value)} className={field} />
+          </label>
+          {activeFilters ? (
+            <button
+              type="button"
+              onClick={() => {
+                setFilters(emptyFilters);
+                setPage(1);
+              }}
+              className="h-9 rounded-lg px-3 text-xs font-semibold text-[#9b2c2c] transition hover:bg-[#fdecec]"
+            >
+              Clear filters
+            </button>
+          ) : null}
+        </div>
         <div className="min-h-0 flex-1 overflow-auto">
           <table className="w-full min-w-[880px] border-collapse text-left text-sm">
-            <thead className="sticky top-0 z-10 bg-[#193956] text-[#F5F7FA]">
+            <thead className="sticky top-0 z-10 border-b border-[#e6edf3] bg-[#f8fafc] text-[#5c6b7a]">
               <tr>
-                <th scope="col" className="px-5 py-3 font-medium whitespace-nowrap">
-                  Time
-                </th>
-                <th scope="col" className="px-5 py-3 font-medium whitespace-nowrap">
-                  Changed by
-                </th>
-                <th scope="col" className="px-5 py-3 font-medium">
-                  Project
-                </th>
+                <SortHeader label="Time" sortKey="at" sort={sort} onSort={onSort} />
+                <SortHeader label="Changed by" sortKey="actor" sort={sort} onSort={onSort} />
+                <SortHeader label="Project" sortKey="project" sort={sort} onSort={onSort} />
                 <th scope="col" className="px-5 py-3 font-medium">
                   What happened
                 </th>
               </tr>
             </thead>
             <tbody>
-              {entries.length === 0 ? (
+              {paged.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="px-5 py-10 text-center text-sm text-[#5c6b7a]">
-                    No logs yet.
+                  <td colSpan={4} className="px-5 py-20 text-center text-sm text-[#5c6b7a]">
+                    {entries.length === 0 ? "No activity yet. Changes to projects will be recorded here." : "No entries match these filters."}
                   </td>
                 </tr>
               ) : (
-                entries.map((entry) => (
+                paged.map((entry) => (
                   <tr
                     key={entry.id}
-                    className="cursor-pointer border-t border-[#e6edf3] text-[#193956] hover:bg-[#f7fafc]"
+                    tabIndex={0}
+                    aria-label={`View log details: ${entry.action} on ${entry.project || "project"}`}
+                    className="cursor-pointer border-t border-[#eef2f6] text-[#193956] outline-none transition-colors hover:bg-[#f5f9fd] focus-visible:bg-[#f1f6fb] focus-visible:ring-2 focus-visible:ring-[#1d4e89]/40 focus-visible:ring-inset"
                     onClick={() => setSelected(entry)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        setSelected(entry);
+                      }
+                    }}
                   >
                     <td className="px-5 py-3.5 whitespace-nowrap text-[#5c6b7a]">
                       <time dateTime={entry.at}>{entry.time}</time>
@@ -133,6 +242,18 @@ export default function HistoryPage() {
             </tbody>
           </table>
         </div>
+        {sorted.length > 0 ? (
+          <Pagination
+            page={currentPage}
+            pageSize={pageSize}
+            total={sorted.length}
+            onPage={setPage}
+            onPageSize={(size) => {
+              setPageSize(size);
+              setPage(1);
+            }}
+          />
+        ) : null}
       </section>
       <AnimatePresence>
       {selected ? (

@@ -25,8 +25,17 @@ body {
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
 }
 
+::selection {
+  background: #c9973a33;
+}
+
+:focus-visible {
+  outline-color: #1d4e89;
+}
+
 table thead th {
   font-size: 11px;
+  color: #5c6b7a;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;

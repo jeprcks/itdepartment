@@ -1,4 +1,5 @@
-import { archiveProject, listArchivedProjects, listProjects, restoreProject, saveProject, type StoredProject } from "@/lib/projects.ts";
+import { authorizeProjectChange, authorizeProjectSave } from "@/lib/project-access.ts";
+import { archiveProject, findProject, listArchivedProjects, listProjects, restoreProject, saveProject, type StoredProject } from "@/lib/projects.ts";
 import { getSession } from "@/lib/sso/session.ts";
 
 function safeHttpUrl(value: unknown) {
@@ -56,6 +57,9 @@ export async function POST(request: Request) {
       return Response.json({ error: "Invalid project" }, { status: 400 });
     }
     const restore = (body as { restore?: unknown }).restore === true;
+    const existing = await findProject(body.id).catch(() => null);
+    const decision = authorizeProjectChange(session, existing);
+    if (!decision.ok) return Response.json({ error: decision.error }, { status: decision.status });
     try {
       const projects = restore ? await restoreProject(body.id) : await archiveProject(body.id);
       return Response.json({ projects });
@@ -65,6 +69,12 @@ export async function POST(request: Request) {
   }
   const project = clean(body?.project);
   if (!project) return Response.json({ error: "Invalid project" }, { status: 400 });
+  const existing = await findProject(project.id).catch(() => null);
+  const decision = authorizeProjectSave(session, existing, project);
+  if (!decision.ok) return Response.json({ error: decision.error }, { status: decision.status });
+  if (existing?.archived) {
+    return Response.json({ error: "Reopen this project from the Archive before editing it." }, { status: 409 });
+  }
   try {
     const projects = await saveProject(project);
     return Response.json({ projects });
