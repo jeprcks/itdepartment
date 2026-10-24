@@ -724,7 +724,7 @@ export default function Homepage({
         <Modal
           labelledBy="project-links-title"
           onClose={() => setSelected(null)}
-          className="w-full max-w-lg rounded-2xl border border-[#d7e0ea] bg-white shadow-2xl"
+          className="w-full max-w-3xl max-h-[90dvh] overflow-y-auto rounded-2xl border border-[#d7e0ea] bg-white shadow-2xl"
         >
             <header className="flex items-start justify-between gap-4 border-b border-[#e6edf3] px-6 py-5">
               <div>
