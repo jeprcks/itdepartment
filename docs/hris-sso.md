@@ -78,3 +78,10 @@ The sidebar badge and the dashboard header show the signed-in role (Super Admin 
 Activity logs store the actor's role at the time (`it_department_logs.actor_role`, db/004, added by `npm run db:migrate`;
 older and HRMS-written rows have none). The logs page shows it under "Changed by", has a Role filter, and the CSV export has a
 "Role" column. Access changes read like "BEN RYAN YBANEZ (Admin) changed IT Department access for DINNES OBERES: Role: No access ? View only."
+
+### When the app cannot reach MySQL directly (e.g. Vercel -> cPanel)
+User Management and the per-request access check use direct MySQL first, then the HRMS signed endpoint
+(`POST /api/sso/project-management/projects`, same HMAC secret) with actions `users_list`, `user_access_get`,
+`user_access_save`. After a failed MySQL connect the app skips direct MySQL for 60 s. If neither answers, the signed
+cookie / HRMS rule is kept (protected Super Admin / Admin always work; nobody is locked out by an outage).
+Logs written through HRMS do not store `actor_role` / `project_id` yet (HRMS `logs_save` ignores them).

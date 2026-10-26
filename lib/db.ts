@@ -86,9 +86,20 @@ export async function ensureSchema(connection: mysql.Connection) {
   ensured = true;
 }
 
-/** Runs fn with a connection, or returns null when the DB is not configured/reachable. */
+const RETRY_AFTER_MS = 60_000;
+let downUntil = 0;
+
+/**
+ * Runs fn with a connection, or returns null when the DB is not configured/reachable.
+ * After a failed connect, direct MySQL is skipped for 60 s so callers fall back to HRMS
+ * quickly (e.g. on Vercel when cPanel MySQL is not open to remote hosts).
+ */
 export async function withDb<T>(fn: (connection: mysql.Connection) => Promise<T>): Promise<T | null> {
-  const connection = await connectDb().catch(() => null);
+  if (Date.now() < downUntil) return null;
+  const connection = await connectDb().catch(() => {
+    downUntil = Date.now() + RETRY_AFTER_MS;
+    return null;
+  });
   if (!connection) return null;
   try {
     await ensureSchema(connection);

@@ -3,6 +3,8 @@ import { ROLE_LABELS, assignableRoles, authorizeAccessChange, canManageUsers, is
 import { listManagedUsers, saveAccessRow } from "@/lib/user-access.ts";
 import { getSession } from "@/lib/sso/session.ts";
 
+const UNREACHABLE = "HRIS is not reachable (neither the database nor the HRMS endpoint answered).";
+
 async function superAdmin() {
   const session = await getSession();
   if (!session) return { error: Response.json({ error: "Not signed in" }, { status: 401 }) };
@@ -14,7 +16,7 @@ export async function GET() {
   const { session, error } = await superAdmin();
   if (!session) return error;
   const users = await listManagedUsers().catch(() => null);
-  if (!users) return Response.json({ error: "The HRIS database is not reachable." }, { status: 503 });
+  if (!users) return Response.json({ error: UNREACHABLE }, { status: 503 });
   return Response.json({
     users: users.map((user) => ({ ...user, assignable: assignableRoles(session.access, user.employeeNumber) })),
     me: session.sub,
@@ -27,7 +29,7 @@ export async function PATCH(request: Request) {
   const body = (await request.json().catch(() => null)) as { employeeNumber?: unknown; role?: unknown; enabled?: unknown } | null;
   const employeeNumber = typeof body?.employeeNumber === "string" ? body.employeeNumber.trim() : "";
   const users = await listManagedUsers().catch(() => null);
-  if (!users) return Response.json({ error: "The HRIS database is not reachable." }, { status: 503 });
+  if (!users) return Response.json({ error: UNREACHABLE }, { status: 503 });
   const before = users.find((user) => user.employeeNumber.toLowerCase() === employeeNumber.toLowerCase());
   if (!before) return Response.json({ error: "Employee not found in HRIS." }, { status: 404 });
 
@@ -37,7 +39,11 @@ export async function PATCH(request: Request) {
   const decision = authorizeAccessChange(session, { employeeNumber: before.employeeNumber, role, enabled });
   if (!decision.ok) return Response.json({ error: decision.error }, { status: decision.status });
 
-  await saveAccessRow(before.employeeNumber, role, enabled, session.name);
+  try {
+    await saveAccessRow(before.employeeNumber, role, enabled, session.name);
+  } catch {
+    return Response.json({ error: UNREACHABLE }, { status: 503 });
+  }
 
   const changes: string[] = [];
   const beforeRole = before.source === "bootstrap" ? before.access : before.assignedRole;
