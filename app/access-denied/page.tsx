@@ -11,6 +11,8 @@ async function DeniedContent({
   const { reason } = await searchParams;
   const hrms = hrmsDashboardUrl();
   const signin = reason === "signin";
+  const noaccess = reason === "noaccess";
+  const forbidden = reason === "forbidden";
   return (
     <main className="flex min-h-dvh flex-1 items-center justify-center bg-[#f5f7fa] p-6 font-sans">
       <div className="max-w-md rounded-xl border border-[#d7e0ea] bg-white p-8 text-center shadow-sm">
@@ -21,7 +23,11 @@ async function DeniedContent({
         <p className="mt-3 text-sm text-[#5c6b7a]">
           {signin
             ? "Your session has ended. Open Project Management again from the HRMS menu."
-            : "IT Department Project Management is only available to IT Department staff, the President and system administrators. If you think this is wrong, contact HR or IT."}
+            : noaccess
+              ? "Your access to IT Department Project Management has been turned off by the administrator. Contact IT if you need it back."
+              : forbidden
+                ? "That page is only available to the Super Admin and Admin."
+                : "IT Department Project Management is only available to IT Department staff, the President and system administrators. If you think this is wrong, contact HR or IT."}
         </p>
         {hrms ? (
           <a

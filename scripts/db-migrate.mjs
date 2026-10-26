@@ -41,6 +41,10 @@ try {
     await connection.query("ALTER TABLE it_department_logs ADD INDEX idx_logs_project_id (project_id)");
     console.log("Added index it_department_logs.idx_logs_project_id");
   }
+  if (!(await has("it_department_logs", "column", "actor_role"))) {
+    await connection.query("ALTER TABLE it_department_logs ADD COLUMN actor_role VARCHAR(20) NULL DEFAULT NULL AFTER actor");
+    console.log("Added column it_department_logs.actor_role (004)");
+  }
   // Backfill (002): only where the name matches exactly one project; ambiguous/unknown names stay NULL.
   const backfill = readFileSync(new URL("../db/002_logs_project_id.sql", import.meta.url), "utf8");
   const update = backfill.slice(backfill.indexOf("UPDATE it_department_logs"));
@@ -56,6 +60,10 @@ try {
   );
   console.log(`Backfill: ${res.affectedRows} rows linked now; total ${stats.total}, linked ${stats.linked ?? 0}, ` +
     `unlinked with name ${stats.unlinked_named ?? 0} (ambiguous ${amb.n}), no project name ${stats.no_name ?? 0}`);
+  // 003: User Management access table (CREATE TABLE IF NOT EXISTS, safe to re-run).
+  await connection.query(readFileSync(new URL("../db/003_user_access.sql", import.meta.url), "utf8"));
+  const [[ua]] = await connection.query("SELECT COUNT(*) AS n FROM it_department_user_access");
+  console.log(`User access table ready: ${ua.n} admin decisions stored`);
   const [[p]] = await connection.query("SELECT COUNT(*) AS n, SUM(archived = 1) AS a FROM it_department_projects");
   const [[l]] = await connection.query("SELECT COUNT(*) AS n FROM it_department_logs");
   console.log(`OK: ${DB_NAME} — projects: ${p.n} (${p.a ?? 0} archived), logs: ${l.n}`);

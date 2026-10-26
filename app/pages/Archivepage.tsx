@@ -12,7 +12,7 @@ type ArchivedProject = {
   assignees?: string[];
 };
 
-export default function ArchivePage({ viewerName }: { viewerName: string }) {
+export default function ArchivePage({ viewerName, readOnly = false }: { viewerName: string; readOnly?: boolean }) {
   const [projects, setProjects] = useState<ArchivedProject[]>([]);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState("");
@@ -75,7 +75,9 @@ export default function ArchivePage({ viewerName }: { viewerName: string }) {
             <p className="mt-0.5 text-xs text-[#5c6b7a]">{projects.length} archived</p>
             {error ? <p role="alert" className="mt-1 text-xs text-[#9b2c2c]">{error}</p> : null}
           </div>
+          {readOnly ? <span className="inline-flex items-center gap-1 rounded-full border border-[#d7e0ea] bg-[#eef3f8] px-2.5 py-1 text-xs font-semibold text-[#385875]"><i className="bi bi-eye" aria-hidden="true" />View only</span> : null}
           <a
+            hidden={readOnly}
             href="/api/export/projects?archived=1"
             download
             className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg border border-[#d7e0ea] bg-white px-3 text-xs font-semibold text-[#385875] transition hover:border-[#385875] hover:bg-[#eef3f8]"
@@ -124,6 +126,7 @@ export default function ArchivePage({ viewerName }: { viewerName: string }) {
                     <td className="px-5 py-3.5 text-right align-top">
                       <button
                         type="button"
+                        hidden={readOnly}
                         disabled={busyId === project.id}
                         onClick={() => void reopen(project)}
                         className="inline-flex items-center gap-1.5 rounded-md border border-[#d7e0ea] px-2.5 py-1 text-xs font-semibold text-[#1d4e89] transition hover:border-[#1d4e89] hover:bg-[#e8f1fb] disabled:opacity-50"

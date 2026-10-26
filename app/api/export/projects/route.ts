@@ -1,10 +1,13 @@
 import { csvResponse, toCsv } from "@/lib/csv.ts";
 import { listArchivedProjects, listProjects } from "@/lib/projects.ts";
 import { getSession } from "@/lib/sso/session.ts";
+import { isViewOnly } from "@/lib/sso/access.ts";
 
 export async function GET(request: Request) {
   const session = await getSession();
   if (!session) return Response.json({ error: "Not signed in" }, { status: 401 });
+  // View only: on-screen reading only, no bulk download.
+  if (isViewOnly(session.access)) return Response.json({ error: "View only accounts cannot export." }, { status: 403 });
   const archived = new URL(request.url).searchParams.get("archived") === "1";
   const projects = archived ? await listArchivedProjects() : await listProjects();
   const csv = toCsv(

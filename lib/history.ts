@@ -4,6 +4,7 @@ export type HistoryEntry = {
   time: string;
   at: string;
   actor: string;
+  actorRole?: string;
   action: string;
   project: string;
   employee: string;

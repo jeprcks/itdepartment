@@ -200,7 +200,7 @@ export function issueSessionCookie(
   };
 }
 
-const ACCESS_LEVELS: AccessLevel[] = ["super_admin", "president", "it_staff"];
+const ACCESS_LEVELS: AccessLevel[] = ["super_admin", "admin", "president", "it_staff", "viewer"];
 
 /** Verifies signature AND expiry. Returns null for anything invalid. */
 export function readSessionProfile(

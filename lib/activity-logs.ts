@@ -8,6 +8,8 @@ export type ActivityLog = {
   time: string;
   at: string;
   actor: string;
+  /** Access level of the actor at the time (super_admin, admin, president, it_staff, viewer); empty for old rows. */
+  actorRole?: string;
   action: string;
   project: string;
   /** it_department_projects.id; empty for old rows / HRMS-written rows. */
@@ -19,6 +21,7 @@ export type ActivityLog = {
 function mapRow(row: {
   id: string;
   actor: string;
+  actor_role?: string | null;
   action: string;
   project_name: string;
   project_id?: string | null;
@@ -31,6 +34,7 @@ function mapRow(row: {
   return {
     id: row.id,
     actor: row.actor,
+    actorRole: row.actor_role ?? "",
     action: row.action,
     project: row.project_name,
     projectId: row.project_id ?? "",
@@ -93,7 +97,7 @@ export const LOG_LIMIT = 2000;
 export async function listActivityLogs(): Promise<ActivityLog[]> {
   const fromDb = await withDb(async (connection) => {
     const [rows] = await connection.query(
-      `SELECT id, actor, action, project_name, project_id, employee_name, detail, message, created_at
+      `SELECT id, actor, actor_role, action, project_name, project_id, employee_name, detail, message, created_at
        FROM it_department_logs ORDER BY created_at DESC LIMIT ${LOG_LIMIT}`,
     );
     return (rows as Parameters<typeof mapRow>[0][]).map(mapRow);
@@ -104,11 +108,12 @@ export async function listActivityLogs(): Promise<ActivityLog[]> {
 export async function saveActivityLog(entry: Omit<ActivityLog, "id" | "time" | "at">): Promise<void> {
   const saved = await withDb(async (connection) => {
     await connection.query(
-      `INSERT INTO it_department_logs (id, actor, action, project_name, project_id, employee_name, detail, message, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+      `INSERT INTO it_department_logs (id, actor, actor_role, action, project_name, project_id, employee_name, detail, message, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
       [
         randomBytes(16).toString("hex"),
         entry.actor.slice(0, 160),
+        entry.actorRole ? entry.actorRole.slice(0, 20) : null,
         entry.action.slice(0, 40),
         entry.project.slice(0, 200),
         /^[0-9a-f-]{36}$/i.test(entry.projectId) ? entry.projectId : null,

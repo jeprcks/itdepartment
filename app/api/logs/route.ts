@@ -1,6 +1,7 @@
 import { listActivityLogs, saveActivityLog } from "@/lib/activity-logs.ts";
 import { logsForProject } from "@/lib/log-filters.ts";
 import { getSession } from "@/lib/sso/session.ts";
+import { VIEW_ONLY_ERROR, isViewOnly } from "@/lib/sso/access.ts";
 
 const ACTIONS = new Set([
   "Added",
@@ -27,6 +28,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const session = await getSession();
   if (!session) return Response.json({ error: "Not signed in" }, { status: 401 });
+  if (isViewOnly(session.access)) return Response.json({ error: VIEW_ONLY_ERROR }, { status: 403 });
   const body = (await request.json().catch(() => null)) as {
     action?: unknown;
     project?: unknown;
@@ -42,6 +44,7 @@ export async function POST(request: Request) {
   }
   await saveActivityLog({
     actor: session.name,
+    actorRole: session.access,
     action,
     project: typeof body?.project === "string" ? body.project.trim() : "",
     projectId:

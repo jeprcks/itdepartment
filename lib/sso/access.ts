@@ -1,4 +1,11 @@
-export type AccessLevel = "super_admin" | "president" | "it_staff";
+export type AccessLevel = "super_admin" | "admin" | "president" | "it_staff" | "viewer";
+
+export const VIEW_ONLY_ERROR = "View only accounts cannot make changes.";
+
+/** "viewer" (View only): may read projects and logs; every write and every export is refused server-side. */
+export function isViewOnly(access: string) {
+  return access === "viewer";
+}
 
 type Env = Record<string, string | undefined>;
 
@@ -42,7 +49,7 @@ export type ProjectOwnership = {
 };
 
 export function canManageAll(access: AccessLevel) {
-  return access === "super_admin" || access === "president";
+  return access === "super_admin" || access === "admin" || access === "president";
 }
 
 /** President, super admin, and department head notes are announced. */
@@ -51,6 +58,7 @@ export function canAnnounceNotes(
   env: Env = process.env,
 ) {
   if (canManageAll(viewer.access)) return true;
+  if (isViewOnly(viewer.access)) return false;
   const position = viewer.position.trim().toLowerCase();
   if (position === "") return false;
   return list(env.IT_PM_DEPARTMENT_HEAD_POSITIONS, "department head,dept head,head").includes(
@@ -64,6 +72,7 @@ export function canEditProject(
   project: ProjectOwnership,
 ) {
   if (canManageAll(viewer.access)) return true;
+  if (isViewOnly(viewer.access)) return false;
   const me = viewer.name.trim().toLowerCase();
   if (me === "") return false;
   return (

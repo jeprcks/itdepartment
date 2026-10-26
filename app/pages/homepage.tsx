@@ -8,6 +8,7 @@ import Modal from "@/components/modal";
 import { Pagination, SortHeader, compareValues, nextSort, type SortState } from "@/components/table-controls";
 import type { ActivityLog } from "@/lib/activity-logs.ts";
 import { canAnnounceNotes, canEditProject, type AccessLevel } from "@/lib/sso/access.ts";
+import { ROLE_LABELS } from "@/lib/access-rules.ts";
 
 type ProjectForm = {
   name: string;
@@ -556,7 +557,9 @@ export default function Homepage({
             aria-label="Search projects"
             className="h-10 w-full max-w-xs flex-1 rounded-lg border border-[#d7e0ea] bg-[#f8fafc] px-3 text-sm text-[#193956] outline-none transition placeholder:text-[#8aa0b3] focus:border-[#1d4e89] focus:bg-white focus:ring-2 focus:ring-[#1d4e89]/15"
           />
+          <span title="Your role in IT Department" className="inline-flex items-center gap-1 rounded-full border border-[#d7e0ea] bg-[#eef3f8] px-2.5 py-1 text-xs font-semibold text-[#385875]"><i className={`bi ${viewer.access === "viewer" ? "bi-eye" : "bi-person-badge"}`} aria-hidden="true" />{ROLE_LABELS[viewer.access]}</span>
           <a
+            hidden={viewer.access === "viewer"}
             href="/api/export/projects"
             download
             className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-lg border border-[#d7e0ea] bg-white px-3 text-xs font-semibold text-[#385875] transition hover:border-[#385875] hover:bg-[#eef3f8]"
@@ -900,6 +903,7 @@ export default function Homepage({
 
       <button
         type="button"
+        hidden={viewer.access === "viewer"}
         onClick={() => setAdding(true)}
         aria-label="New project"
         className="fixed right-7 bottom-7 z-40 flex h-12 items-center gap-2 rounded-full bg-[#193956] px-5 text-sm font-medium text-white shadow-lg transition hover:-translate-y-0.5 hover:bg-[#385875]"

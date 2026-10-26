@@ -7,6 +7,8 @@ import {
   resolveAccess,
   safeNextPath,
 } from "../../../../lib/sso/handshake.ts";
+import { effectiveAccess } from "../../../../lib/access-rules.ts";
+import { readAccessRow } from "../../../../lib/user-access.ts";
 
 export async function POST(request: Request) {
   const config = readHandshakeConfig();
@@ -34,7 +36,18 @@ export async function POST(request: Request) {
     return Response.json({ error: "Authentication failed" }, { status: 401 });
   }
 
-  const access = resolveAccess(result.claims);
+  // User Management decision wins; no row = existing HRMS rule; IT_PM_BOOTSTRAP_SUPER_ADMINS / _ADMINS are protected Super Admin / Admin.
+  // DB unreachable (row undefined) = HRMS rule, so a DB outage never locks everyone out.
+  const row = await readAccessRow(result.claims.employeeNumber);
+  const decided = effectiveAccess(result.claims.employeeNumber, resolveAccess(result.claims), row ?? null);
+  if (decided.access === "none") {
+    console.info("hris sso denied by user access", { employee: result.claims.employeeNumber });
+    return new Response(null, {
+      status: 303,
+      headers: { Location: "/access-denied?reason=noaccess", "Cache-Control": "no-store" },
+    });
+  }
+  const access = decided.access;
   const cookie = issueSessionCookie(
     sessionSecret,
     result.claims,

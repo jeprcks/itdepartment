@@ -44,3 +44,37 @@ Projects and activity logs live in MySQL (`DB_*` in `.env`, the HRMS database, e
 - `IT_PM_SESSION_SECRET` (>= 32 chars, must differ from `HRIS_SSO_SECRET`)
 - `IT_PM_SESSION_MAX_AGE_SECONDS` (default 7200, clamped 300-28800)
 - `IT_PM_PRESIDENT_POSITIONS`, `IT_PM_IT_DEPARTMENT_CODES`, `IT_PM_IT_DEPARTMENT_NAMES` (comma lists)
+
+## User Management (who can open IT Department)
+
+Page at `/users` (sidebar "User Management"), open ONLY to the Super Admin and Admin. Lists every HRIS employee (read-only on
+`employees`, `users`, `roles`, `departments`, `positions`). Decisions are stored in
+`it_department_user_access` (db/003_user_access.sql, created by `npm run db:migrate`).
+
+Access at login and on every request (re-checked every ~5 s, so changes apply without re-login):
+1. `IT_PM_BOOTSTRAP_SUPER_ADMINS` (e.g. `WS168`, Arley, IT head) -> always Super Admin; nobody can edit, demote or disable them.
+   `IT_PM_BOOTSTRAP_ADMINS` (e.g. `WS-001`, Ben) -> Admin: sees and edits everything and everyone except the Super Admin; only the Super Admin can change an Admin.
+   These env lists are the only way to get Super Admin / Admin; nobody can assign Super Admin in the UI, and stored or HRMS super_admin/admin elsewhere is capped at President.
+2. A row in `it_department_user_access` -> the admin's role; disabled or "No access" = denied (`/access-denied?reason=noaccess`).
+3. No row -> the existing HRMS rule (HRMS super_admin / president -> President; other HRMS-eligible IT staff -> IT Staff).
+4. DB unreachable -> the HRMS rule / signed cookie is kept, so an outage never locks everyone out.
+
+Nobody can change their own access. Every change is written to Activity logs
+(actions "Role changed", "Access enabled", "Access disabled").
+Note: HRMS still decides who sees the launch button (IT department, President, super_admin). Granting
+access here to someone outside that group only works once HRMS lets them launch.
+
+### View only role (`viewer`)
+Assignable by the Super Admin and Admin in Edit role / Add user (label "View only"). A viewer can sign in and look at the
+dashboard, project details, activity logs and archive. Every change is refused server-side with 403
+(`POST /api/projects` create/edit/archive/reopen, `POST /api/logs`, sending notifications), and CSV exports
+(`/api/export/projects`, `/api/export/logs`) are also 403 for viewers (on-screen reading only). Buttons are hidden and a
+"View only" badge is shown. Viewers cannot open User Management. HRMS never gives `viewer` by default; it only comes from
+a decision stored on the User Management page. HRMS still only shows the launch button to IT staff, the President and
+super_admin, so a View only account outside IT cannot launch the app until HRMS allows it.
+
+### Roles shown across the app
+The sidebar badge and the dashboard header show the signed-in role (Super Admin / Admin / President / IT Staff / View only).
+Activity logs store the actor's role at the time (`it_department_logs.actor_role`, db/004, added by `npm run db:migrate`;
+older and HRMS-written rows have none). The logs page shows it under "Changed by", has a Role filter, and the CSV export has a
+"Role" column. Access changes read like "BEN RYAN YBANEZ (Admin) changed IT Department access for DINNES OBERES: Role: No access ? View only."

@@ -9,11 +9,14 @@ const items = [
   { href: "/archive", label: "Archive", icon: "bi-archive" },
 ];
 
-export default function SidebarNav() {
+const adminItems = [{ href: "/users", label: "User Management", icon: "bi-people" }];
+
+export default function SidebarNav({ isSuperAdmin = false }: { isSuperAdmin?: boolean }) {
   const pathname = usePathname();
+  const links = isSuperAdmin ? [...items, ...adminItems] : items;
   return (
     <nav className="flex flex-1 flex-col px-0 py-2" aria-label="Main">
-      {items.map((item) => {
+      {links.map((item) => {
         const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
         return (
           <Link

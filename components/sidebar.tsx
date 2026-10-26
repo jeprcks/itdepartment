@@ -4,8 +4,10 @@ import SidebarNav from "@/components/sidebar-nav";
 
 const ACCESS_LABELS = {
   super_admin: "Super Admin",
+  admin: "Admin",
   president: "President",
   it_staff: "IT Staff",
+  viewer: "View only",
 } as const;
 
 export default async function Sidebar() {
@@ -14,7 +16,9 @@ export default async function Sidebar() {
   const hrms = hrmsDashboardUrl();
   const role = profile.position || formatLabel(profile.accountType);
   const access = ACCESS_LABELS[profile.access];
-  const badge = role.trim().toLowerCase() === access.trim().toLowerCase() ? access : role;
+  // Badge = role in this app (same names as User Management); HRIS position shown under the name.
+  const badge = access;
+  const subtitle = role.trim() && role.trim().toLowerCase() !== access.toLowerCase() ? `${access} · ${role}` : access;
   const initials = profile.name
     .split(/\s+/)
     .filter(Boolean)
@@ -40,7 +44,7 @@ export default async function Sidebar() {
         </div>
       </div>
 
-      <SidebarNav />
+      <SidebarNav isSuperAdmin={profile.access === "super_admin" || profile.access === "admin"} />
 
       <div className="shrink-0 bg-black/12 px-3 py-2.5">
         {hrms ? (
@@ -58,7 +62,7 @@ export default async function Sidebar() {
           </div>
           <div className="min-w-0 flex-1">
             <p className="truncate text-[0.8rem] font-semibold text-white capitalize">{profile.name.toLowerCase()}</p>
-            <p className="truncate text-[0.68rem] text-white/50">{access}</p>
+            <p className="truncate text-[0.68rem] text-white/50">{subtitle}</p>
           </div>
         </div>
       </div>

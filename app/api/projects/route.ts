@@ -1,6 +1,7 @@
 import { authorizeProjectChange, authorizeProjectSave } from "@/lib/project-access.ts";
 import { archiveProject, findProject, listArchivedProjects, listProjects, restoreProject, saveProject, type StoredProject } from "@/lib/projects.ts";
 import { getSession } from "@/lib/sso/session.ts";
+import { VIEW_ONLY_ERROR, isViewOnly } from "@/lib/sso/access.ts";
 
 function safeHttpUrl(value: unknown) {
   const raw = typeof value === "string" ? value.trim() : "";
@@ -51,6 +52,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const session = await getSession();
   if (!session) return Response.json({ error: "Not signed in" }, { status: 401 });
+  if (isViewOnly(session.access)) return Response.json({ error: VIEW_ONLY_ERROR }, { status: 403 });
   const body = (await request.json().catch(() => null)) as { project?: unknown; id?: unknown } | null;
   if (typeof body?.id === "string" && !body.project) {
     if (!/^[0-9a-f-]{36}$/i.test(body.id)) {

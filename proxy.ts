@@ -15,6 +15,12 @@ export function proxy(request: NextRequest) {
     request.cookies.get(SESSION_COOKIE)?.value,
     readSessionSecret(),
   );
+  const adminOnly = pathname === "/users" || pathname.startsWith("/users/") || pathname.startsWith("/api/users");
+  if (profile && adminOnly && profile.access !== "super_admin" && profile.access !== "admin") {
+    // Fresh check also runs in the page and API route; this is the first gate.
+    if (pathname.startsWith("/api/")) return NextResponse.json({ error: "Super Admin or Admin only" }, { status: 403 });
+    return NextResponse.redirect(new URL("/access-denied?reason=forbidden", request.url), 303);
+  }
   if (profile) return NextResponse.next();
 
   if (pathname.startsWith("/api/")) {

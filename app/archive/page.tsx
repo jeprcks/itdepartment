@@ -4,7 +4,7 @@ import { requireSession } from "@/lib/sso/session.ts";
 
 async function GuardedArchive() {
   const session = await requireSession();
-  return <ArchivePage viewerName={session.name} />;
+  return <ArchivePage viewerName={session.name} readOnly={session.access === "viewer"} />;
 }
 
 export default function Archive() {

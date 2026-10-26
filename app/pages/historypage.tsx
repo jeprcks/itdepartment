@@ -7,10 +7,18 @@ import PageHeader from "@/components/page-header";
 import { Pagination, SortHeader, compareValues, nextSort, type SortState } from "@/components/table-controls";
 import { filterLogs, type LogFilters } from "@/lib/log-filters.ts";
 import type { HistoryEntry } from "@/lib/history.ts";
+import { APP_ROLES, ROLE_LABELS, isAppRole } from "@/lib/access-rules.ts";
+
+function roleLabel(role?: string) {
+  return isAppRole(role) ? ROLE_LABELS[role] : "";
+}
 
 function describeLog(entry: HistoryEntry) {
-  const who = entry.actor || "Someone";
+  const who = entry.actor ? `${entry.actor}${roleLabel(entry.actorRole) ? ` (${roleLabel(entry.actorRole)})` : ""}` : "Someone";
   const person = entry.employee;
+  if ((entry.action === "Role changed" || entry.action === "Access enabled" || entry.action === "Access disabled") && person) {
+    return `${who} changed IT Department access for ${person}: ${entry.detail || entry.action}.`;
+  }
   if (entry.action === "Assigned" && person) {
     return `${who} assigned ${person} as IT staff on this project.`;
   }
@@ -55,9 +63,9 @@ function noteText(entry: HistoryEntry) {
 
 type LogSortKey = "at" | "actor" | "project" | "action";
 
-const emptyFilters: Required<LogFilters> = { project: "", person: "", action: "", from: "", to: "" };
+const emptyFilters: Required<LogFilters> = { project: "", person: "", action: "", role: "", from: "", to: "" };
 
-export default function HistoryPage() {
+export default function HistoryPage({ readOnly = false }: { readOnly?: boolean }) {
   const [entries, setEntries] = useState<HistoryEntry[]>([]);
   const [selected, setSelected] = useState<HistoryEntry | null>(null);
   const [filters, setFilters] = useState(emptyFilters);
@@ -134,7 +142,9 @@ export default function HistoryPage() {
               Showing {filtered.length} of {entries.length} entries
             </p>
           </div>
+          {readOnly ? <span className="inline-flex items-center gap-1 rounded-full border border-[#d7e0ea] bg-[#eef3f8] px-2.5 py-1 text-xs font-semibold text-[#385875]"><i className="bi bi-eye" aria-hidden="true" />View only</span> : null}
           <a
+            hidden={readOnly}
             href={exportHref}
             download
             className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg border border-[#d7e0ea] bg-white px-3 text-xs font-semibold text-[#385875] transition hover:border-[#385875] hover:bg-[#eef3f8]"
@@ -163,6 +173,17 @@ export default function HistoryPage() {
               placeholder="Changed by or employee"
               className={`${field} w-48`}
             />
+          </label>
+          <label className="grid gap-1 text-[11px] font-medium text-[#5c6b7a]">
+            Role
+            <select value={filters.role} onChange={(event) => setFilter("role", event.target.value)} className={`${field} min-w-32`}>
+              <option value="">All roles</option>
+              {APP_ROLES.filter((value) => value !== "none").map((value) => (
+                <option key={value} value={value}>
+                  {ROLE_LABELS[value]}
+                </option>
+              ))}
+            </select>
           </label>
           <label className="grid gap-1 text-[11px] font-medium text-[#5c6b7a]">
             Action
@@ -233,7 +254,10 @@ export default function HistoryPage() {
                     <td className="px-5 py-3.5 whitespace-nowrap text-[#5c6b7a]">
                       <time dateTime={entry.at}>{entry.time}</time>
                     </td>
-                    <td className="px-5 py-3.5 whitespace-nowrap">{entry.actor || "—"}</td>
+                    <td className="px-5 py-3.5 whitespace-nowrap">
+                      {entry.actor || "—"}
+                      {roleLabel(entry.actorRole) ? <span className="block text-xs text-[#5c6b7a]">{roleLabel(entry.actorRole)}</span> : null}
+                    </td>
                     <td className="px-5 py-3.5">{entry.project || "—"}</td>
                     <td className="px-5 py-3.5">{describeLog(entry)}</td>
                   </tr>
@@ -283,7 +307,7 @@ export default function HistoryPage() {
               <p>{describeLog(selected)}</p>
               <p className="text-xs text-[#5c6b7a]">
                 <time dateTime={selected.at}>{selected.time}</time>
-                {selected.actor ? ` · Changed by ${selected.actor}` : ""}
+                {selected.actor ? ` · Changed by ${selected.actor}${roleLabel(selected.actorRole) ? ` (${roleLabel(selected.actorRole)})` : ""}` : ""}
               </p>
               {noteText(selected) ? (
                 <div>

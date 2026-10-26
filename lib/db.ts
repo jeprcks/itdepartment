@@ -19,6 +19,7 @@ export const PROJECTS_TABLE_SQL = `CREATE TABLE IF NOT EXISTS it_department_proj
 export const LOGS_TABLE_SQL = `CREATE TABLE IF NOT EXISTS it_department_logs (
   id VARCHAR(64) NOT NULL PRIMARY KEY,
   actor VARCHAR(160) NOT NULL,
+  actor_role VARCHAR(20) NULL DEFAULT NULL,
   action VARCHAR(40) NOT NULL,
   project_name VARCHAR(200) NOT NULL DEFAULT '',
   project_id VARCHAR(64) NULL DEFAULT NULL,
@@ -74,6 +75,13 @@ export async function ensureSchema(connection: mysql.Connection) {
   );
   if (Number((logIdx as { n: number }[])[0]?.n ?? 0) === 0) {
     await connection.query("ALTER TABLE it_department_logs ADD INDEX idx_logs_project_id (project_id)");
+  }
+  const [roleCols] = await connection.query(
+    `SELECT COUNT(*) AS n FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'it_department_logs' AND COLUMN_NAME = 'actor_role'`,
+  );
+  if (Number((roleCols as { n: number }[])[0]?.n ?? 0) === 0) {
+    await connection.query("ALTER TABLE it_department_logs ADD COLUMN actor_role VARCHAR(20) NULL DEFAULT NULL AFTER actor");
   }
   ensured = true;
 }
