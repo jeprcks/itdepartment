@@ -1,4 +1,5 @@
 import { getSession } from "@/lib/sso/session.ts";
+import { hrmsDashboardUrl } from "@/lib/sso/handshake.ts";
 import SidebarNav from "@/components/sidebar-nav";
 
 const ACCESS_LABELS = {
@@ -12,6 +13,7 @@ const ACCESS_LABELS = {
 export default async function Sidebar() {
   const profile = await getSession();
   if (!profile) return null;
+  const hrms = hrmsDashboardUrl();
   const role = profile.position || formatLabel(profile.accountType);
   const access = ACCESS_LABELS[profile.access];
   // Badge = role in this app (same names as User Management); HRIS position shown under the name.
@@ -45,6 +47,15 @@ export default async function Sidebar() {
       <SidebarNav isSuperAdmin={profile.access === "super_admin" || profile.access === "admin"} />
 
       <div className="shrink-0 bg-black/12 px-3 py-2.5">
+        {hrms ? (
+          <a
+            href={hrms}
+            className="mb-2 flex items-center gap-[11px] rounded-lg px-2.5 py-2 text-[0.835rem] font-medium text-white/80 hover:bg-white/7 hover:text-white"
+          >
+            <i className="bi bi-arrow-left-circle w-5 text-center text-base opacity-90" />
+            <span className="truncate">Home</span>
+          </a>
+        ) : null}
         <div className="flex items-center gap-2.5">
           <div className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-full bg-[#c9973a] text-xs font-bold text-white shadow-[0_0_0_2px_rgba(255,255,255,0.15)]">
             {initials || "?"}
