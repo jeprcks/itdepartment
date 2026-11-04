@@ -468,13 +468,12 @@ export default function Homepage({
         {hrmsUrl ? (
           <a
             href={hrmsUrl}
-            aria-label="Back to HRMS Dashboard"
-            title="Back to HRMS Dashboard"
+            aria-label="Home"
+            title="Home"
             className="inline-flex h-10 items-center gap-2 rounded-full border border-[#d7e0ea] bg-white px-3 text-sm font-semibold text-[#193956] shadow-sm transition hover:-translate-y-0.5 hover:border-[#193956] hover:bg-[#f5f9fd] focus-visible:ring-2 focus-visible:ring-[#1d4e89]/40 focus-visible:outline-none sm:px-4"
           >
             <i className="bi bi-arrow-left-circle text-base" aria-hidden="true" />
-            <span className="hidden sm:inline">Back to HRMS Dashboard</span>
-            <span className="sm:hidden">HRMS</span>
+            <span>Home</span>
           </a>
         ) : null}
         <button
