@@ -30,7 +30,7 @@ export function SortHeader<K extends string>({
     <th
       scope="col"
       aria-sort={active ? (sort.dir === "asc" ? "ascending" : "descending") : "none"}
-      className={`px-5 py-3 font-medium whitespace-nowrap ${className}`}
+      className={`px-3 py-2.5 font-medium whitespace-nowrap sm:px-5 sm:py-3 ${className}`}
     >
       <button
         type="button"
@@ -68,7 +68,7 @@ export function Pagination({
   const btn =
     "rounded-md border border-[#d7e0ea] px-2.5 py-1 text-xs font-semibold text-[#385875] transition hover:bg-[#eef3f8] disabled:cursor-not-allowed disabled:opacity-40";
   return (
-    <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-[#e6edf3] px-5 py-3 text-xs text-[#5c6b7a]">
+    <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-[#e6edf3] px-3 py-3 text-xs text-[#5c6b7a] sm:px-5">
       <label className="flex items-center gap-2">
         Rows per page
         <select

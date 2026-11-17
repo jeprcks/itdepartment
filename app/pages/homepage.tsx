@@ -4,6 +4,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import DepartmentLoading from "@/components/department-loading";
 import PageHeader from "@/components/page-header";
+import { PAGE_SHELL_CLASS, TABLE_CLASS, TABLE_SCROLL_CLASS, TOOLBAR_CLASS } from "@/components/page-shell";
 import Modal from "@/components/modal";
 import { Pagination, SortHeader, compareValues, nextSort, type SortState } from "@/components/table-controls";
 import type { ActivityLog } from "@/lib/activity-logs.ts";
@@ -454,7 +455,7 @@ export default function Homepage({
   ];
 
   return (
-    <div className="relative flex min-h-dvh flex-1 flex-col bg-[#f4f7fb] px-5 py-5 font-sans sm:px-7 sm:py-6">
+    <div className={`relative ${PAGE_SHELL_CLASS}`}>
       {booting ? (
         <div className="absolute inset-0 z-30 flex bg-[#f4f7fb]">
           <DepartmentLoading />
@@ -501,7 +502,7 @@ export default function Homepage({
         </div>
       </PageHeader>
       <div
-        className="mb-5 grid shrink-0 grid-cols-2 gap-3 lg:grid-cols-5"
+        className="mb-5 grid shrink-0 grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5"
         role="group"
         aria-label="Filter by status"
       >
@@ -538,7 +539,7 @@ export default function Homepage({
         })}
       </div>
       <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-[#d7e0ea] bg-white shadow-sm">
-        <header className="flex shrink-0 flex-wrap items-center gap-3 border-b border-[#e6edf3] px-5 py-4">
+        <header className={TOOLBAR_CLASS}>
           <div className="mr-auto">
             <h2 className="text-sm font-bold tracking-tight text-[#193956]">Projects</h2>
             <p className="mt-0.5 text-xs text-[#5c6b7a]">
@@ -554,7 +555,7 @@ export default function Homepage({
             }}
             placeholder="Search by project, owner, or staff"
             aria-label="Search projects"
-            className="h-10 w-full max-w-xs flex-1 rounded-lg border border-[#d7e0ea] bg-[#f8fafc] px-3 text-sm text-[#193956] outline-none transition placeholder:text-[#8aa0b3] focus:border-[#1d4e89] focus:bg-white focus:ring-2 focus:ring-[#1d4e89]/15"
+            className="h-10 w-full min-w-0 max-w-xs flex-1 rounded-lg border border-[#d7e0ea] bg-[#f8fafc] px-3 text-sm text-[#193956] outline-none transition placeholder:text-[#8aa0b3] focus:border-[#1d4e89] focus:bg-white focus:ring-2 focus:ring-[#1d4e89]/15"
           />
           <span title="Your role in IT Department" className="inline-flex items-center gap-1 rounded-full border border-[#d7e0ea] bg-[#eef3f8] px-2.5 py-1 text-xs font-semibold text-[#385875]"><i className={`bi ${viewer.access === "viewer" ? "bi-eye" : "bi-person-badge"}`} aria-hidden="true" />{ROLE_LABELS[viewer.access]}</span>
           <a
@@ -567,13 +568,13 @@ export default function Homepage({
             Export CSV
           </a>
         </header>
-        <div className="min-h-0 flex-1 overflow-auto">
-          <table className="w-full min-w-[980px] border-collapse text-left text-sm">
+        <div className={TABLE_SCROLL_CLASS}>
+          <table className={`${TABLE_CLASS} page-table min-w-[980px]`}>
             <thead className="sticky top-0 z-10 border-b border-[#e6edf3] bg-[#f8fafc] text-[#5c6b7a]">
               <tr>
                 <SortHeader label="Owner" sortKey="name" sort={sort} onSort={onSort} className="sticky left-0 bg-[#f8fafc]" />
                 <SortHeader label="Project" sortKey="projectName" sort={sort} onSort={onSort} />
-                <th scope="col" className="px-5 py-3 font-medium whitespace-nowrap">
+                <th scope="col" className="px-3 py-2.5 font-medium whitespace-nowrap sm:px-5 sm:py-3">
                   IT staff
                 </th>
                 <SortHeader label="Status" sortKey="status" sort={sort} onSort={onSort} />
@@ -581,7 +582,7 @@ export default function Homepage({
                 <SortHeader label="Deadline" sortKey="deadline" sort={sort} onSort={onSort} />
                 <th
                   scope="col"
-                  className="px-5 py-3 text-right font-medium whitespace-nowrap"
+                  className="px-3 py-2.5 text-right font-medium whitespace-nowrap sm:px-5 sm:py-3"
                 >
                   <span className="sr-only">Actions</span>
                 </th>
@@ -627,22 +628,22 @@ export default function Homepage({
                   }}
                   className="group cursor-pointer border-t border-[#eef2f6] text-[#193956] outline-none transition-colors focus-visible:bg-[#f1f6fb] focus-visible:ring-2 focus-visible:ring-[#1d4e89]/40 focus-visible:ring-inset"
                 >
-                  <td className="sticky left-0 bg-white px-5 py-3.5 align-top whitespace-nowrap group-hover:bg-[#f5f9fd] group-focus-visible:bg-[#f1f6fb]">
-                    <span className="flex items-center gap-2.5">
+                  <td className="sticky left-0 max-w-[12rem] bg-white px-3 py-3 align-top sm:px-5 sm:py-3.5 group-hover:bg-[#f5f9fd] group-focus-visible:bg-[#f1f6fb]">
+                    <span className="flex min-w-0 items-center gap-2.5">
                       <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#c9973a] text-[11px] font-bold text-white shadow-[0_0_0_2px_rgba(201,151,58,0.25)]">
                         {initials(project.name)}
                       </span>
-                      {project.name}
+                      <span className="truncate" title={project.name}>{project.name}</span>
                     </span>
                   </td>
-                  <td className="px-5 py-3.5 align-top font-medium group-hover:bg-[#f5f9fd] group-focus-visible:bg-[#f1f6fb]">
-                    {project.projectName}
+                  <td className="max-w-[18rem] px-3 py-3 align-top font-medium sm:px-5 sm:py-3.5 group-hover:bg-[#f5f9fd] group-focus-visible:bg-[#f1f6fb]">
+                    <span className="block truncate" title={project.projectName}>{project.projectName}</span>
                   </td>
-                  <td className="px-5 py-3.5 align-top text-[#5c6b7a] group-hover:bg-[#f5f9fd] group-focus-visible:bg-[#f1f6fb]">
+                  <td className="max-w-[12rem] px-3 py-3 align-top text-[#5c6b7a] sm:px-5 sm:py-3.5 group-hover:bg-[#f5f9fd] group-focus-visible:bg-[#f1f6fb]">
                     {(assignedBy[project.id] ?? []).length > 0 ? (
                       <ul className="space-y-1">
                         {assignedBy[project.id].map((name) => (
-                          <li key={name} className="whitespace-nowrap leading-5">
+                          <li key={name} className="truncate leading-5" title={name}>
                             {name}
                           </li>
                         ))}
@@ -651,15 +652,15 @@ export default function Homepage({
                       <span className="text-[#8aa0b3] italic">Unassigned</span>
                     )}
                   </td>
-                  <td className="px-5 py-3.5 align-top whitespace-nowrap group-hover:bg-[#f5f9fd] group-focus-visible:bg-[#f1f6fb]">
+                  <td className="px-3 py-3 align-top whitespace-nowrap sm:px-5 sm:py-3.5 group-hover:bg-[#f5f9fd] group-focus-visible:bg-[#f1f6fb]">
                     <span
                       className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${statusStyles[statuses[project.id]] ?? "bg-[#fff6df] text-[#8a5b00]"}`}
                     >
                       {statuses[project.id]}
                     </span>
                   </td>
-                  <td className="px-5 py-3.5 align-top group-hover:bg-[#f5f9fd] group-focus-visible:bg-[#f1f6fb]">
-                    <div className="flex min-w-36 items-center gap-3">
+                  <td className="px-3 py-3 align-top sm:px-5 sm:py-3.5 group-hover:bg-[#f5f9fd] group-focus-visible:bg-[#f1f6fb]">
+                    <div className="flex min-w-28 items-center gap-3 sm:min-w-36">
                       <div
                         className="h-1.5 flex-1 overflow-hidden rounded-full bg-[#e6edf3]"
                         role="presentation"
@@ -676,14 +677,14 @@ export default function Homepage({
                       </span>
                     </div>
                   </td>
-                  <td className="px-5 py-3.5 align-top whitespace-nowrap text-[#5c6b7a] group-hover:bg-[#f5f9fd] group-focus-visible:bg-[#f1f6fb]">
+                  <td className="px-3 py-3 align-top whitespace-nowrap text-[#5c6b7a] sm:px-5 sm:py-3.5 group-hover:bg-[#f5f9fd] group-focus-visible:bg-[#f1f6fb]">
                     <time dateTime={project.deadline}>
                       {deadlineFormat.format(new Date(project.deadline))}
                     </time>
                   </td>
-                  <td className="px-5 py-3.5 align-top whitespace-nowrap group-hover:bg-[#f5f9fd] group-focus-visible:bg-[#f1f6fb]">
+                  <td className="px-3 py-3 align-top whitespace-nowrap sm:px-5 sm:py-3.5 group-hover:bg-[#f5f9fd] group-focus-visible:bg-[#f1f6fb]">
                     <div
-                      className="flex items-center justify-end gap-1"
+                      className="flex flex-nowrap items-center justify-end gap-1"
                       onClick={(event) => event.stopPropagation()}
                       onKeyDown={(event) => event.stopPropagation()}
                     >

@@ -22,6 +22,7 @@ export default function SidebarNav({ isSuperAdmin = false }: { isSuperAdmin?: bo
           <Link
             key={item.href}
             href={item.href}
+            onClick={() => window.dispatchEvent(new Event("it-pm-close-sidebar"))}
             className={`relative mx-2.5 my-px flex items-center gap-[11px] rounded-lg px-2.5 py-2 text-[0.835rem] ${
               active
                 ? "bg-white/[0.14] font-semibold text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.06)]"

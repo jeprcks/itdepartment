@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence } from "motion/react";
 import Modal from "@/components/modal";
 import PageHeader from "@/components/page-header";
+import { FILTER_ROW_CLASS, PAGE_SHELL_CLASS, TABLE_CLASS, TABLE_SCROLL_CLASS, TOOLBAR_CLASS } from "@/components/page-shell";
 import { Pagination, SortHeader, compareValues, nextSort, type SortState } from "@/components/table-controls";
 import { filterLogs, type LogFilters } from "@/lib/log-filters.ts";
 import type { HistoryEntry } from "@/lib/history.ts";
@@ -102,7 +103,7 @@ export default function HistoryPage({ readOnly = false }: { readOnly?: boolean }
     setPage(1);
   };
   const field =
-    "h-9 rounded-lg border border-[#d7e0ea] bg-[#f8fafc] px-2.5 text-xs text-[#193956] outline-none transition focus:border-[#1d4e89] focus:bg-white focus:ring-2 focus:ring-[#1d4e89]/15";
+    "h-9 w-full min-w-0 rounded-lg border border-[#d7e0ea] bg-[#f8fafc] px-2.5 text-xs text-[#193956] outline-none transition focus:border-[#1d4e89] focus:bg-white focus:ring-2 focus:ring-[#1d4e89]/15 sm:w-auto";
 
   useEffect(() => {
     let active = true;
@@ -129,13 +130,13 @@ export default function HistoryPage({ readOnly = false }: { readOnly?: boolean }
   }, [selected]);
 
   return (
-    <div className="flex min-h-dvh flex-1 flex-col bg-[#f4f7fb] px-5 py-5 font-sans sm:px-7 sm:py-6">
+    <div className={PAGE_SHELL_CLASS}>
       <PageHeader
         title="Activity logs"
         description="A complete record of who changed which project, and what changed. Click a row for details."
       />
       <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-[#d7e0ea] bg-white shadow-sm">
-        <header className="flex shrink-0 flex-wrap items-center gap-3 border-b border-[#e6edf3] px-5 py-4">
+        <header className={TOOLBAR_CLASS}>
           <div className="mr-auto">
             <h2 className="text-sm font-bold tracking-tight text-[#193956]">Recent activity</h2>
             <p className="mt-0.5 text-xs text-[#5c6b7a]">
@@ -153,10 +154,10 @@ export default function HistoryPage({ readOnly = false }: { readOnly?: boolean }
             Export CSV
           </a>
         </header>
-        <div className="flex shrink-0 flex-wrap items-end gap-3 border-b border-[#e6edf3] bg-[#fbfcfe] px-5 py-3" role="search" aria-label="Filter logs">
-          <label className="grid gap-1 text-[11px] font-medium text-[#5c6b7a]">
+        <div className={FILTER_ROW_CLASS} role="search" aria-label="Filter logs">
+          <label className="grid min-w-0 flex-1 basis-[11rem] gap-1 text-[11px] font-medium text-[#5c6b7a] sm:flex-none sm:basis-auto">
             Project
-            <select value={filters.project} onChange={(event) => setFilter("project", event.target.value)} className={`${field} min-w-40`}>
+            <select value={filters.project} onChange={(event) => setFilter("project", event.target.value)} className={`${field} sm:min-w-40`}>
               <option value="">All projects</option>
               {projectOptions.map((name) => (
                 <option key={name} value={name}>
@@ -165,18 +166,18 @@ export default function HistoryPage({ readOnly = false }: { readOnly?: boolean }
               ))}
             </select>
           </label>
-          <label className="grid gap-1 text-[11px] font-medium text-[#5c6b7a]">
+          <label className="grid min-w-0 flex-1 basis-[11rem] gap-1 text-[11px] font-medium text-[#5c6b7a] sm:flex-none sm:basis-auto">
             Person
             <input
               value={filters.person}
               onChange={(event) => setFilter("person", event.target.value)}
               placeholder="Changed by or employee"
-              className={`${field} w-48`}
+              className={`${field} sm:w-48`}
             />
           </label>
-          <label className="grid gap-1 text-[11px] font-medium text-[#5c6b7a]">
+          <label className="grid min-w-0 flex-1 basis-[9rem] gap-1 text-[11px] font-medium text-[#5c6b7a] sm:flex-none sm:basis-auto">
             Role
-            <select value={filters.role} onChange={(event) => setFilter("role", event.target.value)} className={`${field} min-w-32`}>
+            <select value={filters.role} onChange={(event) => setFilter("role", event.target.value)} className={`${field} sm:min-w-32`}>
               <option value="">All roles</option>
               {APP_ROLES.filter((value) => value !== "none").map((value) => (
                 <option key={value} value={value}>
@@ -185,9 +186,9 @@ export default function HistoryPage({ readOnly = false }: { readOnly?: boolean }
               ))}
             </select>
           </label>
-          <label className="grid gap-1 text-[11px] font-medium text-[#5c6b7a]">
+          <label className="grid min-w-0 flex-1 basis-[9rem] gap-1 text-[11px] font-medium text-[#5c6b7a] sm:flex-none sm:basis-auto">
             Action
-            <select value={filters.action} onChange={(event) => setFilter("action", event.target.value)} className={`${field} min-w-36`}>
+            <select value={filters.action} onChange={(event) => setFilter("action", event.target.value)} className={`${field} sm:min-w-36`}>
               <option value="">All actions</option>
               {actionOptions.map((name) => (
                 <option key={name} value={name}>
@@ -196,11 +197,11 @@ export default function HistoryPage({ readOnly = false }: { readOnly?: boolean }
               ))}
             </select>
           </label>
-          <label className="grid gap-1 text-[11px] font-medium text-[#5c6b7a]">
+          <label className="grid min-w-0 flex-1 basis-[9rem] gap-1 text-[11px] font-medium text-[#5c6b7a] sm:flex-none sm:basis-auto">
             From
             <input type="date" value={filters.from} max={filters.to || undefined} onChange={(event) => setFilter("from", event.target.value)} className={field} />
           </label>
-          <label className="grid gap-1 text-[11px] font-medium text-[#5c6b7a]">
+          <label className="grid min-w-0 flex-1 basis-[9rem] gap-1 text-[11px] font-medium text-[#5c6b7a] sm:flex-none sm:basis-auto">
             To
             <input type="date" value={filters.to} min={filters.from || undefined} onChange={(event) => setFilter("to", event.target.value)} className={field} />
           </label>
@@ -217,14 +218,14 @@ export default function HistoryPage({ readOnly = false }: { readOnly?: boolean }
             </button>
           ) : null}
         </div>
-        <div className="min-h-0 flex-1 overflow-auto">
-          <table className="w-full min-w-[880px] border-collapse text-left text-sm">
+        <div className={TABLE_SCROLL_CLASS}>
+          <table className={`${TABLE_CLASS} page-table min-w-[880px]`}>
             <thead className="sticky top-0 z-10 border-b border-[#e6edf3] bg-[#f8fafc] text-[#5c6b7a]">
               <tr>
                 <SortHeader label="Time" sortKey="at" sort={sort} onSort={onSort} />
                 <SortHeader label="Changed by" sortKey="actor" sort={sort} onSort={onSort} />
                 <SortHeader label="Project" sortKey="project" sort={sort} onSort={onSort} />
-                <th scope="col" className="px-5 py-3 font-medium">
+                <th scope="col" className="px-3 py-2.5 font-medium sm:px-5 sm:py-3">
                   What happened
                 </th>
               </tr>
@@ -251,15 +252,15 @@ export default function HistoryPage({ readOnly = false }: { readOnly?: boolean }
                       }
                     }}
                   >
-                    <td className="px-5 py-3.5 whitespace-nowrap text-[#5c6b7a]">
+                    <td className="px-3 py-3 whitespace-nowrap text-[#5c6b7a] sm:px-5 sm:py-3.5">
                       <time dateTime={entry.at}>{entry.time}</time>
                     </td>
-                    <td className="px-5 py-3.5 whitespace-nowrap">
+                    <td className="px-3 py-3 whitespace-nowrap sm:px-5 sm:py-3.5">
                       {entry.actor || "—"}
                       {roleLabel(entry.actorRole) ? <span className="block text-xs text-[#5c6b7a]">{roleLabel(entry.actorRole)}</span> : null}
                     </td>
-                    <td className="px-5 py-3.5">{entry.project || "—"}</td>
-                    <td className="px-5 py-3.5">{describeLog(entry)}</td>
+                    <td className="max-w-[16rem] px-3 py-3 sm:px-5 sm:py-3.5"><span className="block truncate" title={entry.project || undefined}>{entry.project || "—"}</span></td>
+                    <td className="max-w-[28rem] px-3 py-3 sm:px-5 sm:py-3.5"><span className="line-clamp-2" title={describeLog(entry)}>{describeLog(entry)}</span></td>
                   </tr>
                 ))
               )}

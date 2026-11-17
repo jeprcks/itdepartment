@@ -32,7 +32,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"
         />
       </head>
-      <body className="flex h-full min-h-full">
+      <body className="flex h-full min-h-full overflow-hidden">
         <SidebarFrame>
           <Suspense
             fallback={
@@ -42,7 +42,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             <Sidebar />
           </Suspense>
         </SidebarFrame>
-        <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col">{children}</div>
+        <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden">{children}</div>
       </body>
     </html>
   );

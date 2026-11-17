@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { AnimatePresence } from "motion/react";
 import Modal from "@/components/modal";
 import PageHeader from "@/components/page-header";
+import { FILTER_ROW_CLASS, PAGE_SHELL_CLASS, TABLE_CLASS, TABLE_SCROLL_CLASS, TOOLBAR_CLASS } from "@/components/page-shell";
 import { Pagination, SortHeader, compareValues, nextSort, type SortState } from "@/components/table-controls";
 import { APP_ROLES, ROLE_LABELS, type AppRole } from "@/lib/access-rules.ts";
 import type { ManagedUser as BaseUser } from "@/lib/user-access.ts";
@@ -28,8 +29,8 @@ const STATUS_STYLES: Record<Status, string> = {
 };
 
 const field =
-  "h-9 rounded-lg border border-[#d7e0ea] bg-[#f8fafc] px-2.5 text-xs text-[#193956] outline-none transition focus:border-[#1d4e89] focus:bg-white focus:ring-2 focus:ring-[#1d4e89]/15";
-const smallBtn = "rounded-md border px-2.5 py-1 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-40";
+  "h-9 w-full min-w-0 rounded-lg border border-[#d7e0ea] bg-[#f8fafc] px-2.5 text-xs text-[#193956] outline-none transition focus:border-[#1d4e89] focus:bg-white focus:ring-2 focus:ring-[#1d4e89]/15 sm:w-auto";
+const smallBtn = "rounded-md border px-2.5 py-1 text-xs font-semibold whitespace-nowrap transition disabled:cursor-not-allowed disabled:opacity-40";
 
 export default function UsersPage({ me, viewerAccess }: { me: string; viewerAccess: string }) {
   const [users, setUsers] = useState<ManagedUser[] | null>(null);
@@ -150,7 +151,7 @@ export default function UsersPage({ me, viewerAccess }: { me: string; viewerAcce
   const editTarget = editing ? editing.user ?? all.find((user) => user.employeeNumber === editing.pick) ?? null : null;
 
   return (
-    <div className="flex min-h-dvh flex-1 flex-col bg-[#f4f7fb] px-5 py-5 font-sans sm:px-7 sm:py-6">
+    <div className={PAGE_SHELL_CLASS}>
       <PageHeader
         title="User Management"
         description="Every employee from HRIS. Decide who can open IT Department Project Management and what role they get. Your decision overrides the HRIS default."
@@ -175,7 +176,7 @@ export default function UsersPage({ me, viewerAccess }: { me: string; viewerAcce
       ) : null}
 
       <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-[#d7e0ea] bg-white shadow-sm">
-        <header className="flex shrink-0 flex-wrap items-center gap-3 border-b border-[#e6edf3] px-5 py-4">
+        <header className={TOOLBAR_CLASS}>
           <div className="mr-auto">
             <h2 className="text-sm font-bold tracking-tight text-[#193956]">Employees</h2>
             <p className="mt-0.5 text-xs text-[#5c6b7a]">
@@ -183,8 +184,8 @@ export default function UsersPage({ me, viewerAccess }: { me: string; viewerAcce
             </p>
           </div>
         </header>
-        <div className="flex shrink-0 flex-wrap items-end gap-3 border-b border-[#e6edf3] bg-[#fbfcfe] px-5 py-3" role="search" aria-label="Filter users">
-          <label className="grid gap-1 text-[11px] font-medium text-[#5c6b7a]">
+        <div className={FILTER_ROW_CLASS} role="search" aria-label="Filter users">
+          <label className="grid min-w-0 flex-1 basis-[12rem] gap-1 text-[11px] font-medium text-[#5c6b7a] sm:flex-none sm:basis-auto">
             Search
             <input
               value={search}
@@ -193,12 +194,12 @@ export default function UsersPage({ me, viewerAccess }: { me: string; viewerAcce
                 setPage(1);
               }}
               placeholder="Name, ID, email or position"
-              className={`${field} w-60`}
+              className={`${field} sm:w-60`}
             />
           </label>
-          <label className="grid gap-1 text-[11px] font-medium text-[#5c6b7a]">
+          <label className="grid min-w-0 flex-1 basis-[11rem] gap-1 text-[11px] font-medium text-[#5c6b7a] sm:flex-none sm:basis-auto">
             Department
-            <select value={department} onChange={(event) => { setDepartment(event.target.value); setPage(1); }} className={`${field} min-w-40`}>
+            <select value={department} onChange={(event) => { setDepartment(event.target.value); setPage(1); }} className={`${field} sm:min-w-40`}>
               <option value="">All departments</option>
               {departments.map((name) => (
                 <option key={name} value={name}>
@@ -207,9 +208,9 @@ export default function UsersPage({ me, viewerAccess }: { me: string; viewerAcce
               ))}
             </select>
           </label>
-          <label className="grid gap-1 text-[11px] font-medium text-[#5c6b7a]">
+          <label className="grid min-w-0 flex-1 basis-[9rem] gap-1 text-[11px] font-medium text-[#5c6b7a] sm:flex-none sm:basis-auto">
             Role
-            <select value={role} onChange={(event) => { setRole(event.target.value); setPage(1); }} className={`${field} min-w-36`}>
+            <select value={role} onChange={(event) => { setRole(event.target.value); setPage(1); }} className={`${field} sm:min-w-36`}>
               <option value="">All roles</option>
               {APP_ROLES.map((value) => (
                 <option key={value} value={value}>
@@ -218,9 +219,9 @@ export default function UsersPage({ me, viewerAccess }: { me: string; viewerAcce
               ))}
             </select>
           </label>
-          <label className="grid gap-1 text-[11px] font-medium text-[#5c6b7a]">
+          <label className="grid min-w-0 flex-1 basis-[9rem] gap-1 text-[11px] font-medium text-[#5c6b7a] sm:flex-none sm:basis-auto">
             Status
-            <select value={status} onChange={(event) => { setStatus(event.target.value); setPage(1); }} className={`${field} min-w-32`}>
+            <select value={status} onChange={(event) => { setStatus(event.target.value); setPage(1); }} className={`${field} sm:min-w-32`}>
               <option value="">All statuses</option>
               {(Object.keys(STATUS_LABELS) as Status[]).map((value) => (
                 <option key={value} value={value}>
@@ -245,18 +246,18 @@ export default function UsersPage({ me, viewerAccess }: { me: string; viewerAcce
             </button>
           ) : null}
         </div>
-        <div className="min-h-0 flex-1 overflow-auto">
-          <table className="w-full min-w-[1080px] border-collapse text-left text-sm">
+        <div className={TABLE_SCROLL_CLASS}>
+          <table className={`${TABLE_CLASS} page-table min-w-[1080px]`}>
             <thead className="sticky top-0 z-10 border-b border-[#e6edf3] bg-[#f8fafc] text-[#5c6b7a]">
               <tr>
                 <SortHeader label="ID" sortKey="employeeNumber" sort={sort} onSort={onSort} />
                 <SortHeader label="Name" sortKey="name" sort={sort} onSort={onSort} />
                 <SortHeader label="Department" sortKey="department" sort={sort} onSort={onSort} />
-                <th scope="col" className="px-5 py-3 font-medium whitespace-nowrap uppercase">HRIS role</th>
+                <th scope="col" className="px-3 py-2.5 font-medium whitespace-nowrap uppercase sm:px-5 sm:py-3">HRIS role</th>
                 <SortHeader label="IT Dept role" sortKey="access" sort={sort} onSort={onSort} />
-                <th scope="col" className="px-5 py-3 font-medium whitespace-nowrap uppercase">Role source</th>
+                <th scope="col" className="px-3 py-2.5 font-medium whitespace-nowrap uppercase sm:px-5 sm:py-3">Role source</th>
                 <SortHeader label="Status" sortKey="status" sort={sort} onSort={onSort} />
-                <th scope="col" className="px-5 py-3 text-right font-medium uppercase">Actions</th>
+                <th scope="col" className="px-3 py-2.5 text-right font-medium whitespace-nowrap uppercase sm:px-5 sm:py-3">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -276,27 +277,27 @@ export default function UsersPage({ me, viewerAccess }: { me: string; viewerAcce
                   const locked = protectedUser(user);
                   return (
                     <tr key={user.employeeNumber} className="border-b border-[#eef2f6] last:border-0 hover:bg-[#f8fbfe]">
-                      <td className="px-5 py-3 font-mono text-xs whitespace-nowrap text-[#385875]">{user.employeeNumber}</td>
-                      <td className="px-5 py-3">
-                        <p className="font-semibold text-[#193956] capitalize">{user.name.toLowerCase()}</p>
-                        <p className="text-xs text-[#5c6b7a]">{user.email || "—"}</p>
+                      <td className="px-3 py-3 font-mono text-xs whitespace-nowrap text-[#385875] sm:px-5">{user.employeeNumber}</td>
+                      <td className="max-w-[16rem] px-3 py-3 sm:px-5">
+                        <p className="truncate font-semibold text-[#193956] capitalize" title={user.name}>{user.name.toLowerCase()}</p>
+                        <p className="truncate text-xs text-[#5c6b7a]" title={user.email || undefined}>{user.email || "—"}</p>
                       </td>
-                      <td className="px-5 py-3 text-[#385875]">
-                        {user.department || "—"}
-                        {user.position ? <span className="block text-xs text-[#5c6b7a]">{user.position}</span> : null}
+                      <td className="max-w-[14rem] px-3 py-3 text-[#385875] sm:px-5">
+                        <span className="block truncate" title={user.department || undefined}>{user.department || "—"}</span>
+                        {user.position ? <span className="block truncate text-xs text-[#5c6b7a]" title={user.position}>{user.position}</span> : null}
                       </td>
-                      <td className="px-5 py-3 text-[#385875]">{user.hrisRole || "—"}</td>
-                      <td className="px-5 py-3 font-medium text-[#193956]">{ROLE_LABELS[user.access]}</td>
-                      <td className="px-5 py-3 text-xs text-[#5c6b7a]">
-                        {SOURCE_LABELS[user.source]}
-                        {user.updatedBy ? <span className="block">by {user.updatedBy}</span> : null}
+                      <td className="max-w-[10rem] px-3 py-3 text-[#385875] sm:px-5"><span className="block truncate" title={user.hrisRole || undefined}>{user.hrisRole || "—"}</span></td>
+                      <td className="px-3 py-3 font-medium whitespace-nowrap text-[#193956] sm:px-5">{ROLE_LABELS[user.access]}</td>
+                      <td className="max-w-[10rem] px-3 py-3 text-xs text-[#5c6b7a] sm:px-5">
+                        <span className="block truncate">{SOURCE_LABELS[user.source]}</span>
+                        {user.updatedBy ? <span className="block truncate" title={user.updatedBy}>by {user.updatedBy}</span> : null}
                       </td>
-                      <td className="px-5 py-3">
+                      <td className="px-3 py-3 whitespace-nowrap sm:px-5">
                         <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${STATUS_STYLES[state]}`}>{STATUS_LABELS[state]}</span>
                         {!user.hrisActive ? <span className="mt-1 block text-[11px] text-[#9b2c2c]">Inactive in HRIS</span> : null}
                       </td>
-                      <td className="px-5 py-3">
-                        <div className="flex justify-end gap-1.5">
+                      <td className="px-3 py-3 whitespace-nowrap sm:px-5">
+                        <div className="flex flex-nowrap justify-end gap-1.5">
                           <button
                             type="button"
                             disabled={locked}

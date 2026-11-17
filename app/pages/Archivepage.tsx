@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import PageHeader from "@/components/page-header";
+import { PAGE_SHELL_CLASS, TABLE_CLASS, TABLE_SCROLL_CLASS, TOOLBAR_CLASS } from "@/components/page-shell";
 
 type ArchivedProject = {
   id: string;
@@ -63,13 +64,13 @@ export default function ArchivePage({ viewerName, readOnly = false }: { viewerNa
   }
 
   return (
-    <div className="flex min-h-dvh flex-1 flex-col bg-[#f4f7fb] px-5 py-5 font-sans sm:px-7 sm:py-6">
+    <div className={PAGE_SHELL_CLASS}>
       <PageHeader
         title="Archive"
         description="Projects moved off the dashboard. Reopen a project to return it to the dashboard."
       />
       <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-[#d7e0ea] bg-white shadow-sm">
-        <header className="flex shrink-0 flex-wrap items-center gap-3 border-b border-[#e6edf3] px-5 py-4">
+        <header className={TOOLBAR_CLASS}>
           <div className="mr-auto">
             <h2 className="text-sm font-bold tracking-tight text-[#193956]">Archived projects</h2>
             <p className="mt-0.5 text-xs text-[#5c6b7a]">{projects.length} archived</p>
@@ -86,15 +87,15 @@ export default function ArchivePage({ viewerName, readOnly = false }: { viewerNa
             Export CSV
           </a>
         </header>
-        <div className="min-h-0 flex-1 overflow-auto">
-          <table className="w-full min-w-[760px] border-collapse text-left text-sm">
+        <div className={TABLE_SCROLL_CLASS}>
+          <table className={`${TABLE_CLASS} page-table min-w-[760px]`}>
             <thead className="sticky top-0 z-10 border-b border-[#e6edf3] bg-[#f8fafc] text-[#5c6b7a]">
               <tr>
-                <th scope="col" className="px-5 py-3 font-medium">Owner</th>
-                <th scope="col" className="px-5 py-3 font-medium">Project</th>
-                <th scope="col" className="px-5 py-3 font-medium">IT staff</th>
-                <th scope="col" className="px-5 py-3 font-medium">Status</th>
-                <th scope="col" className="px-5 py-3 text-right font-medium"><span className="sr-only">Actions</span></th>
+                <th scope="col" className="px-3 py-2.5 font-medium sm:px-5 sm:py-3">Owner</th>
+                <th scope="col" className="px-3 py-2.5 font-medium sm:px-5 sm:py-3">Project</th>
+                <th scope="col" className="px-3 py-2.5 font-medium sm:px-5 sm:py-3">IT staff</th>
+                <th scope="col" className="px-3 py-2.5 font-medium sm:px-5 sm:py-3">Status</th>
+                <th scope="col" className="px-3 py-2.5 text-right font-medium sm:px-5 sm:py-3"><span className="sr-only">Actions</span></th>
               </tr>
             </thead>
             <tbody>
@@ -107,13 +108,13 @@ export default function ArchivePage({ viewerName, readOnly = false }: { viewerNa
               ) : (
                 projects.map((project) => (
                   <tr key={project.id} className="border-t border-[#eef2f6] text-[#193956] transition-colors hover:bg-[#f5f9fd]">
-                    <td className="px-5 py-3.5 align-top whitespace-nowrap">{project.name}</td>
-                    <td className="px-5 py-3.5 align-top font-medium">{project.projectName}</td>
-                    <td className="px-5 py-3.5 align-top text-[#5c6b7a]">
+                    <td className="max-w-[12rem] px-3 py-3 align-top sm:px-5 sm:py-3.5"><span className="block truncate" title={project.name}>{project.name}</span></td>
+                    <td className="max-w-[18rem] px-3 py-3 align-top font-medium sm:px-5 sm:py-3.5"><span className="block truncate" title={project.projectName}>{project.projectName}</span></td>
+                    <td className="max-w-[12rem] px-3 py-3 align-top text-[#5c6b7a] sm:px-5 sm:py-3.5">
                       {(project.assignees ?? []).length > 0 ? (
                         <ul className="space-y-1">
                           {project.assignees?.map((name) => (
-                            <li key={name} className="whitespace-nowrap leading-5">
+                            <li key={name} className="truncate leading-5" title={name}>
                               {name}
                             </li>
                           ))}
@@ -122,8 +123,8 @@ export default function ArchivePage({ viewerName, readOnly = false }: { viewerNa
                         <span className="text-[#8aa0b3] italic">Unassigned</span>
                       )}
                     </td>
-                    <td className="px-5 py-3.5 align-top whitespace-nowrap">{project.status}</td>
-                    <td className="px-5 py-3.5 text-right align-top">
+                    <td className="px-3 py-3 align-top whitespace-nowrap sm:px-5 sm:py-3.5">{project.status}</td>
+                    <td className="px-3 py-3 text-right align-top whitespace-nowrap sm:px-5 sm:py-3.5">
                       <button
                         type="button"
                         hidden={readOnly}
