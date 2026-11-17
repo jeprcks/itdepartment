@@ -1,16 +1,52 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { usePathname } from "next/navigation";
 
 export default function SidebarFrame({ children }: { children: ReactNode }) {
+  const pathname = usePathname();
   const [desktopOpen, setDesktopOpen] = useState(true);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const hamburgerRef = useRef<HTMLButtonElement>(null);
+  const drawerRef = useRef<HTMLDivElement>(null);
+  const hideShell = pathname === "/access-denied";
 
   useEffect(() => {
     const close = () => setMobileOpen(false);
     window.addEventListener("it-pm-close-sidebar", close);
     return () => window.removeEventListener("it-pm-close-sidebar", close);
   }, []);
+
+  useEffect(() => {
+    if (!mobileOpen) return;
+
+    const hamburger = hamburgerRef.current;
+    const locked = [document.documentElement, document.body, document.getElementById("app-main")].filter(
+      (node): node is HTMLElement => Boolean(node),
+    );
+    const previous = locked.map((node) => node.style.overflow);
+    for (const node of locked) node.style.overflow = "hidden";
+
+    const first = drawerRef.current?.querySelector<HTMLElement>('a[href], button:not([disabled])');
+    first?.focus();
+
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      setMobileOpen(false);
+    }
+    document.addEventListener("keydown", onKeyDown);
+
+    return () => {
+      locked.forEach((node, index) => {
+        node.style.overflow = previous[index] ?? "";
+      });
+      document.removeEventListener("keydown", onKeyDown);
+      hamburger?.focus();
+    };
+  }, [mobileOpen]);
+
+  if (hideShell) return null;
 
   return (
     <>
@@ -24,6 +60,7 @@ export default function SidebarFrame({ children }: { children: ReactNode }) {
       ) : null}
 
       <button
+        ref={hamburgerRef}
         type="button"
         onClick={() => setMobileOpen(true)}
         aria-expanded={mobileOpen}
@@ -35,6 +72,7 @@ export default function SidebarFrame({ children }: { children: ReactNode }) {
       </button>
 
       <div
+        ref={drawerRef}
         className={`h-dvh shrink-0 max-md:fixed max-md:inset-y-0 max-md:left-0 max-md:z-50 md:sticky md:top-0 md:z-30 ${
           mobileOpen ? "flex" : "hidden md:flex"
         }`}

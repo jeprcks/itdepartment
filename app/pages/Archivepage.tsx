@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import PageHeader from "@/components/page-header";
+import ConfirmModal from "@/components/confirm-modal";
 import { PAGE_SHELL_CLASS, TABLE_CLASS, TABLE_SCROLL_CLASS, TOOLBAR_CLASS } from "@/components/page-shell";
 
 type ArchivedProject = {
@@ -17,6 +18,8 @@ export default function ArchivePage({ viewerName, readOnly = false }: { viewerNa
   const [projects, setProjects] = useState<ArchivedProject[]>([]);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const [reopening, setReopening] = useState<ArchivedProject | null>(null);
+  const [reopenError, setReopenError] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -33,34 +36,52 @@ export default function ArchivePage({ viewerName, readOnly = false }: { viewerNa
     };
   }, []);
 
-  async function reopen(project: ArchivedProject) {
+  function requestReopen(project: ArchivedProject) {
+    setReopenError("");
+    setReopening(project);
+  }
+
+  async function confirmReopen() {
+    const project = reopening;
+    if (!project) return;
     setBusyId(project.id);
-    const response = await fetch("/api/projects", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: project.id, restore: true }),
-    });
-    if (!response.ok) {
-      const body = (await response.json().catch(() => null)) as { error?: string } | null;
-      setError(body?.error || "Couldn't reopen the project. Try again.");
-    } else {
-      setError("");
-      const body = (await response.json()) as { projects?: ArchivedProject[] };
-      setProjects(body.projects ?? []);
-      await fetch("/api/logs", {
+    try {
+      const response = await fetch("/api/projects", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "Restored",
-          project: project.projectName,
-          projectId: project.id,
-          employee: project.name,
-          detail: "Reopened from the archive",
-          message: `${viewerName} reopened ${project.projectName}.`,
-        }),
+        body: JSON.stringify({ id: project.id, restore: true }),
       });
+      if (!response.ok) {
+        const body = (await response.json().catch(() => null)) as { error?: string } | null;
+        const message = body?.error || "Couldn't reopen the project. Try again.";
+        setError(message);
+        setReopenError(message);
+      } else {
+        setError("");
+        setReopenError("");
+        setReopening(null);
+        const body = (await response.json()) as { projects?: ArchivedProject[] };
+        setProjects(body.projects ?? []);
+        await fetch("/api/logs", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "Restored",
+            project: project.projectName,
+            projectId: project.id,
+            employee: project.name,
+            detail: "Reopened from the archive",
+            message: `${viewerName} reopened ${project.projectName}.`,
+          }),
+        });
+      }
+    } catch {
+      const message = "Couldn't reopen the project. Try again.";
+      setError(message);
+      setReopenError(message);
+    } finally {
+      setBusyId(null);
     }
-    setBusyId(null);
   }
 
   return (
@@ -129,7 +150,7 @@ export default function ArchivePage({ viewerName, readOnly = false }: { viewerNa
                         type="button"
                         hidden={readOnly}
                         disabled={busyId === project.id}
-                        onClick={() => void reopen(project)}
+                        onClick={() => requestReopen(project)}
                         className="inline-flex items-center gap-1.5 rounded-md border border-[#d7e0ea] px-2.5 py-1 text-xs font-semibold text-[#1d4e89] transition hover:border-[#1d4e89] hover:bg-[#e8f1fb] disabled:opacity-50"
                       >
                         <i className="bi bi-arrow-counterclockwise" aria-hidden="true" />
@@ -143,6 +164,22 @@ export default function ArchivePage({ viewerName, readOnly = false }: { viewerNa
           </table>
         </div>
       </section>
+      {reopening ? (
+        <ConfirmModal
+          labelledBy="reopen-project-title"
+          title="Reopen this project?"
+          subject={reopening.projectName}
+          description="This will return the project to the dashboard so it can be tracked and updated again."
+          confirmLabel="Reopen project"
+          busyLabel={"Reopening\u2026"}
+          busy={busyId === reopening.id}
+          error={reopenError}
+          onCancel={() => {
+            if (!busyId) setReopening(null);
+          }}
+          onConfirm={() => void confirmReopen()}
+        />
+      ) : null}
     </div>
   );
 }

@@ -255,9 +255,9 @@ export default function HistoryPage({ readOnly = false }: { readOnly?: boolean }
                     <td className="px-3 py-3 whitespace-nowrap text-[#5c6b7a] sm:px-5 sm:py-3.5">
                       <time dateTime={entry.at}>{entry.time}</time>
                     </td>
-                    <td className="px-3 py-3 whitespace-nowrap sm:px-5 sm:py-3.5">
-                      {entry.actor || "—"}
-                      {roleLabel(entry.actorRole) ? <span className="block text-xs text-[#5c6b7a]">{roleLabel(entry.actorRole)}</span> : null}
+                    <td className="max-w-[11rem] px-3 py-3 sm:px-5 sm:py-3.5">
+                      <span className="block truncate" title={entry.actor || undefined}>{entry.actor || "—"}</span>
+                      {roleLabel(entry.actorRole) ? <span className="block truncate text-xs text-[#5c6b7a]" title={roleLabel(entry.actorRole)}>{roleLabel(entry.actorRole)}</span> : null}
                     </td>
                     <td className="max-w-[16rem] px-3 py-3 sm:px-5 sm:py-3.5"><span className="block truncate" title={entry.project || undefined}>{entry.project || "—"}</span></td>
                     <td className="max-w-[28rem] px-3 py-3 sm:px-5 sm:py-3.5"><span className="line-clamp-2" title={describeLog(entry)}>{describeLog(entry)}</span></td>
@@ -285,9 +285,9 @@ export default function HistoryPage({ readOnly = false }: { readOnly?: boolean }
         <Modal
           labelledBy="log-detail-title"
           onClose={() => setSelected(null)}
-          className="w-full max-w-lg rounded-2xl border border-[#d7e0ea] bg-white shadow-2xl"
+          className="flex max-h-[90dvh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-[#d7e0ea] bg-white shadow-2xl"
         >
-            <header className="flex items-start justify-between gap-4 border-b border-[#e6edf3] px-5 py-4">
+            <header className="flex shrink-0 items-start justify-between gap-4 border-b border-[#e6edf3] px-5 py-4">
               <div>
                 <p className="text-xs font-medium tracking-wide text-[#5c6b7a] uppercase">
                   {selected.project || "Log"}
@@ -304,7 +304,8 @@ export default function HistoryPage({ readOnly = false }: { readOnly?: boolean }
                 Close
               </button>
             </header>
-            <div className="flex flex-col gap-4 px-5 py-5 text-sm text-[#193956]">
+            <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 text-sm text-[#193956]">
+            <div className="flex flex-col gap-4">
               <p>{describeLog(selected)}</p>
               <p className="text-xs text-[#5c6b7a]">
                 <time dateTime={selected.at}>{selected.time}</time>
@@ -316,6 +317,7 @@ export default function HistoryPage({ readOnly = false }: { readOnly?: boolean }
                   <p className="mt-1 whitespace-pre-wrap">{noteText(selected)}</p>
                 </div>
               ) : null}
+            </div>
             </div>
         </Modal>
       ) : null}

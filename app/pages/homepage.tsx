@@ -6,6 +6,7 @@ import DepartmentLoading from "@/components/department-loading";
 import PageHeader from "@/components/page-header";
 import { PAGE_SHELL_CLASS, TABLE_CLASS, TABLE_SCROLL_CLASS, TOOLBAR_CLASS } from "@/components/page-shell";
 import Modal from "@/components/modal";
+import ConfirmModal from "@/components/confirm-modal";
 import { Pagination, SortHeader, compareValues, nextSort, type SortState } from "@/components/table-controls";
 import type { ActivityLog } from "@/lib/activity-logs.ts";
 import { canAnnounceNotes, canEditProject, type AccessLevel } from "@/lib/sso/access.ts";
@@ -94,6 +95,9 @@ export default function Homepage({
   const [actionError, setActionError] = useState("");
   const [modalTab, setModalTab] = useState<"details" | "activity">("details");
   const [projectLogs, setProjectLogs] = useState<ActivityLog[] | null>(null);
+  const [archiving, setArchiving] = useState<Project | null>(null);
+  const [archiveBusy, setArchiveBusy] = useState(false);
+  const [archiveError, setArchiveError] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -209,29 +213,44 @@ export default function Homepage({
     }
   }
 
-  async function removeProject(project: Project) {
+  function requestArchive(project: Project) {
     if (!canEdit(project)) return;
-    if (!window.confirm(`Archive ${project.projectName}? You can reopen it from the Archive page.`)) return;
-    const response = await fetch("/api/projects", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: project.id }),
-    });
-    if (!response.ok) {
-      setActionError(await readError(response, "Couldn't archive the project. Try again."));
-      return;
+    setArchiveError("");
+    setArchiving(project);
+  }
+
+  async function confirmArchive() {
+    const project = archiving;
+    if (!project || !canEdit(project)) return;
+    setArchiveBusy(true);
+    try {
+      const response = await fetch("/api/projects", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: project.id }),
+      });
+      if (!response.ok) {
+        setArchiveError(await readError(response, "Couldn't archive the project. Try again."));
+        return;
+      }
+      setActionError("");
+      setArchiveError("");
+      const body = (await response.json()) as { projects?: (Project & { assignees?: string[] })[] };
+      applyProjects(body.projects ?? []);
+      notify({
+        action: "Archived",
+        project: project.projectName,
+        projectId: project.id,
+        employee: project.name,
+        detail: "Moved to the archive",
+        message: `${viewer.name} archived ${project.projectName}.`,
+      });
+      setArchiving(null);
+    } catch {
+      setArchiveError("Couldn't archive the project. Try again.");
+    } finally {
+      setArchiveBusy(false);
     }
-    setActionError("");
-    const body = (await response.json()) as { projects?: (Project & { assignees?: string[] })[] };
-    applyProjects(body.projects ?? []);
-    notify({
-      action: "Archived",
-      project: project.projectName,
-      projectId: project.id,
-      employee: project.name,
-      detail: "Moved to the archive",
-      message: `${viewer.name} archived ${project.projectName}.`,
-    });
   }
 
   async function persist(project: Project, assignees: string[]) {
@@ -278,10 +297,14 @@ export default function Homepage({
   }
 
   useEffect(() => {
-    if (!selected && !adding && !editingId && !notificationsOpen) return;
+    if (!selected && !adding && !editingId && !notificationsOpen && !archiving) return;
 
     function onKeyDown(event: KeyboardEvent) {
       if (event.key !== "Escape") return;
+      if (archiving) {
+        if (!archiveBusy) setArchiving(null);
+        return;
+      }
       setSelected(null);
       setAdding(false);
       setEditingId(null);
@@ -290,7 +313,7 @@ export default function Homepage({
 
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
-  }, [selected, adding, editingId, notificationsOpen]);
+  }, [selected, adding, editingId, notificationsOpen, archiving, archiveBusy]);
 
   function addProject(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -706,7 +729,7 @@ export default function Homepage({
                       <button
                         type="button"
                         hidden={!canEdit(project)}
-                        onClick={() => void removeProject(project)}
+                        onClick={() => requestArchive(project)}
                         className="rounded-md px-2 py-1 text-xs font-semibold text-[#9b2c2c] transition hover:bg-[#fdecec]"
                       >
                         Archive
@@ -737,9 +760,9 @@ export default function Homepage({
         <Modal
           labelledBy="project-links-title"
           onClose={() => setSelected(null)}
-          className="w-full max-w-lg rounded-2xl border border-[#d7e0ea] bg-white shadow-2xl"
+          className="flex max-h-[90dvh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-[#d7e0ea] bg-white shadow-2xl"
         >
-            <header className="flex items-start justify-between gap-4 border-b border-[#e6edf3] px-6 py-5">
+            <header className="flex shrink-0 items-start justify-between gap-4 border-b border-[#e6edf3] px-5 py-5 sm:px-6">
               <div>
                 <p className="text-[11px] font-semibold tracking-[0.12em] text-[#8aa0b3] uppercase">
                   Owned by {selected.name}
@@ -763,7 +786,7 @@ export default function Homepage({
                 Close
               </button>
             </header>
-            <div role="tablist" aria-label="Project sections" className="flex gap-1 border-b border-[#e6edf3] px-6">
+            <div role="tablist" aria-label="Project sections" className="flex shrink-0 gap-1 border-b border-[#e6edf3] px-5 sm:px-6">
               {(["details", "activity"] as const).map((tab) => (
                 <button
                   key={tab}
@@ -782,7 +805,7 @@ export default function Homepage({
               ))}
             </div>
             {modalTab === "activity" ? (
-              <div role="tabpanel" className="max-h-[50vh] overflow-y-auto px-6 py-5">
+              <div role="tabpanel" className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-6">
                 {projectLogs === null ? (
                   <p className="text-sm text-[#5c6b7a]">Loading activity…</p>
                 ) : projectLogs.length === 0 ? (
@@ -806,8 +829,8 @@ export default function Homepage({
                 )}
               </div>
             ) : (
-            <div role="tabpanel" className="flex flex-col gap-5 px-6 py-5">
-              <div>
+            <div role="tabpanel" className="grid min-h-0 flex-1 grid-cols-1 gap-5 overflow-y-auto px-5 py-5 sm:px-6 md:grid-cols-2">
+              <div className="md:col-span-2">
                 <p className="text-xs font-medium text-[#5c6b7a]">Assigned IT staff</p>
                 <p className="mt-1.5 text-sm text-[#193956]">
                   {(assignedBy[selected.id] ?? []).length > 0
@@ -845,7 +868,7 @@ export default function Homepage({
                   <p className="mt-1.5 text-sm text-[#8aa0b3]">No Trello board linked.</p>
                 )}
               </div>
-              <div className="rounded-xl bg-[#f4f7fb] px-4 py-3">
+              <div className="rounded-xl bg-[#f4f7fb] px-4 py-3 md:col-span-2">
                 <p className="text-xs font-medium text-[#5c6b7a]">Notes</p>
                 <p className="mt-1.5 text-sm leading-6 whitespace-pre-wrap text-[#193956]">
                   {selected.notes || "No notes for this project."}
@@ -860,9 +883,9 @@ export default function Homepage({
         <Modal
           labelledBy="notifications-title"
           onClose={() => setNotificationsOpen(false)}
-          className="flex max-h-[80vh] w-full max-w-lg flex-col rounded-2xl border border-[#d7e0ea] bg-white shadow-2xl"
+          className="flex max-h-[90dvh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-[#d7e0ea] bg-white shadow-2xl"
         >
-            <header className="flex items-center justify-between border-b border-[#e6edf3] px-5 py-4">
+            <header className="flex shrink-0 items-center justify-between border-b border-[#e6edf3] px-5 py-4">
               <h2
                 id="notifications-title"
                 className="text-lg font-semibold text-[#193956]"
@@ -877,7 +900,7 @@ export default function Homepage({
                 Close
               </button>
             </header>
-            <div className="overflow-y-auto px-5 py-4">
+            <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
               {visibleNotifications.length === 0 ? (
                 <p className="py-8 text-center text-sm text-[#5c6b7a]">You&apos;re all caught up. New updates will appear here.</p>
               ) : (
@@ -919,12 +942,13 @@ export default function Homepage({
         <Modal
           labelledBy="edit-project-title"
           onClose={() => setEditingId(null)}
-          className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-[#d7e0ea] bg-white shadow-2xl"
+          className="flex max-h-[90dvh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-[#d7e0ea] bg-white shadow-2xl"
         >
           <form
             onSubmit={saveEdit}
+            className="flex min-h-0 flex-1 flex-col"
           >
-            <header className="border-b border-[#e6edf3] px-5 py-4">
+            <header className="shrink-0 border-b border-[#e6edf3] px-5 py-4 sm:px-6">
               <h2
                 id="edit-project-title"
                 className="text-lg font-semibold text-[#193956]"
@@ -933,8 +957,10 @@ export default function Homepage({
               </h2>
               <p className="mt-0.5 text-xs text-[#5c6b7a]">Changes are logged and shared with assigned staff.</p>
             </header>
+            <div className="min-h-0 flex-1 overflow-y-auto">
             <ProjectFields form={editForm} onChange={setEditForm} includeLinks staff={itStaff} />
-            <div className="flex justify-end gap-2 border-t border-[#e6edf3] px-5 py-4">
+            </div>
+            <div className="flex shrink-0 justify-end gap-2 border-t border-[#e6edf3] px-5 py-4 sm:px-6">
               <button
                 type="button"
                 onClick={() => setEditingId(null)}
@@ -958,12 +984,13 @@ export default function Homepage({
         <Modal
           labelledBy="add-project-title"
           onClose={() => setAdding(false)}
-          className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-[#d7e0ea] bg-white shadow-2xl"
+          className="flex max-h-[90dvh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-[#d7e0ea] bg-white shadow-2xl"
         >
           <form
             onSubmit={addProject}
+            className="flex min-h-0 flex-1 flex-col"
           >
-            <header className="flex items-center justify-between border-b border-[#e6edf3] px-5 py-4">
+            <header className="flex shrink-0 items-center justify-between border-b border-[#e6edf3] px-5 py-4 sm:px-6">
               <h2
                 id="add-project-title"
                 className="text-lg font-semibold text-[#193956]"
@@ -978,6 +1005,7 @@ export default function Homepage({
                 Close
               </button>
             </header>
+            <div className="min-h-0 flex-1 overflow-y-auto">
             <ProjectFields
               form={addForm}
               onChange={setAddForm}
@@ -985,7 +1013,8 @@ export default function Homepage({
               staff={itStaff}
               showEmployee={false}
             />
-            <div className="flex items-center justify-end gap-3 border-t border-[#e6edf3] px-5 py-4">
+            </div>
+            <div className="flex shrink-0 items-center justify-end gap-3 border-t border-[#e6edf3] px-5 py-4 sm:px-6">
               {saveError ? <p className="mr-auto text-xs text-[#9b2c2c]">{saveError}</p> : null}
               <button
                 type="submit"
@@ -996,6 +1025,23 @@ export default function Homepage({
             </div>
           </form>
         </Modal>
+      ) : null}
+      {archiving ? (
+        <ConfirmModal
+          labelledBy="archive-project-title"
+          title="Archive this project?"
+          subject={archiving.projectName}
+          description="This will move the project off the dashboard. You can reopen it later from the Archive page."
+          confirmLabel="Archive project"
+          busyLabel={"Archiving\u2026"}
+          busy={archiveBusy}
+          error={archiveError}
+          danger
+          onCancel={() => {
+            if (!archiveBusy) setArchiving(null);
+          }}
+          onConfirm={() => void confirmArchive()}
+        />
       ) : null}
       </AnimatePresence>
     </div>
@@ -1047,7 +1093,7 @@ function ProjectFields({
     "h-10 rounded-lg border border-[#d7e0ea] bg-white px-3 text-sm text-[#193956] outline-none transition focus:border-[#1d4e89] focus:ring-2 focus:ring-[#1d4e89]/15";
 
   return (
-    <div className="grid gap-4 px-6 py-5">
+    <div className="grid grid-cols-1 gap-4 px-5 py-5 sm:px-6 md:grid-cols-2">
       {showEmployee ? (
         <label className="grid gap-1 text-xs font-medium text-[#5c6b7a]">
           Owner
@@ -1079,7 +1125,7 @@ function ProjectFields({
           className={fieldClass}
         />
       </label>
-      <div className="grid gap-1">
+      <div className="grid gap-1 md:col-span-2">
         <span className="text-xs font-medium text-[#5c6b7a]">
           Assigned IT staff
         </span>
@@ -1198,12 +1244,12 @@ function ProjectFields({
           className={fieldClass}
         />
       </label>
-      <label className="grid gap-1 text-xs font-medium text-[#5c6b7a]">
+      <label className="grid gap-1 text-xs font-medium text-[#5c6b7a] md:col-span-2">
         Notes
         <textarea
           value={form.notes}
           onChange={(event) => onChange({ ...form, notes: event.target.value })}
-          rows={3}
+          rows={5}
           placeholder="Context, blockers, or next steps"
           className="rounded-lg border border-[#d7e0ea] px-3 py-2.5 text-sm leading-6 text-[#193956] outline-none transition focus:border-[#1d4e89] focus:ring-2 focus:ring-[#1d4e89]/15"
         />

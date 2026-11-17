@@ -30,7 +30,7 @@ const STATUS_STYLES: Record<Status, string> = {
 
 const field =
   "h-9 w-full min-w-0 rounded-lg border border-[#d7e0ea] bg-[#f8fafc] px-2.5 text-xs text-[#193956] outline-none transition focus:border-[#1d4e89] focus:bg-white focus:ring-2 focus:ring-[#1d4e89]/15 sm:w-auto";
-const smallBtn = "rounded-md border px-2.5 py-1 text-xs font-semibold whitespace-nowrap transition disabled:cursor-not-allowed disabled:opacity-40";
+const smallBtn = "rounded-md border px-2 py-1 text-xs font-semibold whitespace-nowrap transition disabled:cursor-not-allowed disabled:opacity-40";
 
 export default function UsersPage({ me, viewerAccess }: { me: string; viewerAccess: string }) {
   const [users, setUsers] = useState<ManagedUser[] | null>(null);
@@ -133,14 +133,13 @@ export default function UsersPage({ me, viewerAccess }: { me: string; viewerAcce
   useEffect(() => {
     if (!editing && !confirming) return;
     function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        setEditing(null);
-        setConfirming(null);
-      }
+      if (event.key !== "Escape" || saving) return;
+      setEditing(null);
+      setConfirming(null);
     }
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
-  }, [editing, confirming]);
+  }, [editing, confirming, saving]);
 
   useEffect(() => {
     if (!notice) return;
@@ -247,7 +246,7 @@ export default function UsersPage({ me, viewerAccess }: { me: string; viewerAcce
           ) : null}
         </div>
         <div className={TABLE_SCROLL_CLASS}>
-          <table className={`${TABLE_CLASS} page-table min-w-[1080px]`}>
+          <table className={`${TABLE_CLASS} page-table min-w-[980px]`}>
             <thead className="sticky top-0 z-10 border-b border-[#e6edf3] bg-[#f8fafc] text-[#5c6b7a]">
               <tr>
                 <SortHeader label="ID" sortKey="employeeNumber" sort={sort} onSort={onSort} />
@@ -277,27 +276,27 @@ export default function UsersPage({ me, viewerAccess }: { me: string; viewerAcce
                   const locked = protectedUser(user);
                   return (
                     <tr key={user.employeeNumber} className="border-b border-[#eef2f6] last:border-0 hover:bg-[#f8fbfe]">
-                      <td className="px-3 py-3 font-mono text-xs whitespace-nowrap text-[#385875] sm:px-5">{user.employeeNumber}</td>
-                      <td className="max-w-[16rem] px-3 py-3 sm:px-5">
+                      <td className="px-2.5 py-2.5 font-mono text-xs whitespace-nowrap text-[#385875] sm:px-3 lg:px-4">{user.employeeNumber}</td>
+                      <td className="max-w-[12rem] px-2.5 py-2.5 sm:px-3 lg:px-4">
                         <p className="truncate font-semibold text-[#193956] capitalize" title={user.name}>{user.name.toLowerCase()}</p>
                         <p className="truncate text-xs text-[#5c6b7a]" title={user.email || undefined}>{user.email || "—"}</p>
                       </td>
-                      <td className="max-w-[14rem] px-3 py-3 text-[#385875] sm:px-5">
+                      <td className="max-w-[11rem] px-2.5 py-2.5 text-[#385875] sm:px-3 lg:px-4">
                         <span className="block truncate" title={user.department || undefined}>{user.department || "—"}</span>
                         {user.position ? <span className="block truncate text-xs text-[#5c6b7a]" title={user.position}>{user.position}</span> : null}
                       </td>
-                      <td className="max-w-[10rem] px-3 py-3 text-[#385875] sm:px-5"><span className="block truncate" title={user.hrisRole || undefined}>{user.hrisRole || "—"}</span></td>
-                      <td className="px-3 py-3 font-medium whitespace-nowrap text-[#193956] sm:px-5">{ROLE_LABELS[user.access]}</td>
-                      <td className="max-w-[10rem] px-3 py-3 text-xs text-[#5c6b7a] sm:px-5">
+                      <td className="max-w-[8rem] px-2.5 py-2.5 text-[#385875] sm:px-3 lg:px-4"><span className="block truncate" title={user.hrisRole || undefined}>{user.hrisRole || "—"}</span></td>
+                      <td className="px-2.5 py-2.5 font-medium whitespace-nowrap text-[#193956] sm:px-3 lg:px-4">{ROLE_LABELS[user.access]}</td>
+                      <td className="max-w-[8rem] px-2.5 py-2.5 text-xs text-[#5c6b7a] sm:px-3 lg:px-4">
                         <span className="block truncate">{SOURCE_LABELS[user.source]}</span>
                         {user.updatedBy ? <span className="block truncate" title={user.updatedBy}>by {user.updatedBy}</span> : null}
                       </td>
-                      <td className="px-3 py-3 whitespace-nowrap sm:px-5">
-                        <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${STATUS_STYLES[state]}`}>{STATUS_LABELS[state]}</span>
+                      <td className="px-2.5 py-2.5 whitespace-nowrap sm:px-3 lg:px-4">
+                        <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-semibold ${STATUS_STYLES[state]}`}>{STATUS_LABELS[state]}</span>
                         {!user.hrisActive ? <span className="mt-1 block text-[11px] text-[#9b2c2c]">Inactive in HRIS</span> : null}
                       </td>
-                      <td className="px-3 py-3 whitespace-nowrap sm:px-5">
-                        <div className="flex flex-nowrap justify-end gap-1.5">
+                      <td className="px-2.5 py-2.5 whitespace-nowrap sm:px-3 lg:px-4">
+                        <div className="flex flex-nowrap justify-end gap-1">
                           <button
                             type="button"
                             disabled={locked}
@@ -350,8 +349,9 @@ export default function UsersPage({ me, viewerAccess }: { me: string; viewerAcce
 
       <AnimatePresence>
         {editing ? (
-          <Modal labelledBy="user-edit-title" onClose={() => setEditing(null)} className="w-full max-w-lg rounded-2xl border border-[#d7e0ea] bg-white shadow-2xl">
+          <Modal labelledBy="user-edit-title" onClose={() => { if (!saving) setEditing(null); }} className="flex max-h-[90dvh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-[#d7e0ea] bg-white shadow-2xl">
             <form
+              className="flex min-h-0 flex-1 flex-col"
               onSubmit={async (event) => {
                 event.preventDefault();
                 if (!editTarget) {
@@ -366,18 +366,18 @@ export default function UsersPage({ me, viewerAccess }: { me: string; viewerAcce
                 if (ok) setEditing(null);
               }}
             >
-              <header className="flex items-start justify-between gap-4 border-b border-[#e6edf3] px-5 py-4">
+              <header className="flex shrink-0 items-start justify-between gap-4 border-b border-[#e6edf3] px-5 py-4">
                 <div>
                   <p className="text-xs font-medium tracking-wide text-[#5c6b7a] uppercase">{editing.user ? "Edit role" : "Add user"}</p>
                   <h2 id="user-edit-title" className="mt-1 text-lg font-semibold text-[#193956] capitalize">
                     {editTarget ? editTarget.name.toLowerCase() : "Give an employee access"}
                   </h2>
                 </div>
-                <button type="button" onClick={() => setEditing(null)} className="rounded-md px-2 py-1 text-sm text-[#5c6b7a] hover:bg-[#f5f7fa] hover:text-[#193956]">
+                <button type="button" disabled={saving} onClick={() => setEditing(null)} className="rounded-md px-2 py-1 text-sm text-[#5c6b7a] hover:bg-[#f5f7fa] hover:text-[#193956] disabled:opacity-50">
                   Close
                 </button>
               </header>
-              <div className="flex flex-col gap-4 px-5 py-5 text-sm text-[#193956]">
+              <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-5 py-5 text-sm text-[#193956]">
                 {!editing.user ? (
                   <label className="grid gap-1 text-xs font-medium text-[#5c6b7a]">
                     Employee (from HRIS, without access)
@@ -427,8 +427,8 @@ export default function UsersPage({ me, viewerAccess }: { me: string; viewerAcce
                 </fieldset>
                 {saveError ? <p className="rounded-lg bg-[#fdecec] px-3 py-2 text-xs text-[#9b2c2c]">{saveError}</p> : null}
               </div>
-              <footer className="flex justify-end gap-2 border-t border-[#e6edf3] px-5 py-3">
-                <button type="button" onClick={() => setEditing(null)} className="rounded-lg px-3 py-2 text-sm font-semibold text-[#385875] hover:bg-[#eef3f8]">
+              <footer className="flex shrink-0 justify-end gap-2 border-t border-[#e6edf3] px-5 py-3">
+                <button type="button" disabled={saving} onClick={() => setEditing(null)} className="rounded-lg px-3 py-2 text-sm font-semibold text-[#385875] hover:bg-[#eef3f8] disabled:opacity-50">
                   Cancel
                 </button>
                 <button type="submit" disabled={saving || !editTarget} className="rounded-lg bg-[#193956] px-4 py-2 text-sm font-semibold text-white hover:bg-[#385875] disabled:opacity-50">
@@ -439,7 +439,7 @@ export default function UsersPage({ me, viewerAccess }: { me: string; viewerAcce
           </Modal>
         ) : null}
         {confirming ? (
-          <Modal labelledBy="user-confirm-title" onClose={() => setConfirming(null)} className="w-full max-w-md rounded-2xl border border-[#d7e0ea] bg-white shadow-2xl">
+          <Modal labelledBy="user-confirm-title" onClose={() => { if (!saving) setConfirming(null); }} className="w-full max-w-md rounded-2xl border border-[#d7e0ea] bg-white shadow-2xl">
             <div className="px-5 py-5 text-sm text-[#193956]">
               <h2 id="user-confirm-title" className="text-lg font-semibold">
                 {confirming.enabled ? "Disable access?" : "Enable access?"}
@@ -452,7 +452,7 @@ export default function UsersPage({ me, viewerAccess }: { me: string; viewerAcce
               {saveError ? <p className="mt-3 rounded-lg bg-[#fdecec] px-3 py-2 text-xs text-[#9b2c2c]">{saveError}</p> : null}
             </div>
             <footer className="flex justify-end gap-2 border-t border-[#e6edf3] px-5 py-3">
-              <button type="button" onClick={() => setConfirming(null)} className="rounded-lg px-3 py-2 text-sm font-semibold text-[#385875] hover:bg-[#eef3f8]">
+              <button type="button" disabled={saving} onClick={() => setConfirming(null)} className="rounded-lg px-3 py-2 text-sm font-semibold text-[#385875] hover:bg-[#eef3f8] disabled:opacity-50">
                 Cancel
               </button>
               <button

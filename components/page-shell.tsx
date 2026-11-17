@@ -2,9 +2,9 @@ import type { ReactNode } from "react";
 
 /** Shared layout classes so every page uses the same width, padding, and overflow rules. */
 export const PAGE_SHELL_CLASS =
-  "flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[#f4f7fb] px-4 pt-14 pb-4 font-sans sm:px-6 md:px-7 md:py-6";
+  "app-shell flex min-h-full min-w-0 flex-1 flex-col overflow-x-hidden bg-[#f4f7fb] px-4 pt-14 pb-4 font-sans sm:px-6 md:px-7 md:py-6";
 
-export const TABLE_SCROLL_CLASS = "min-h-0 min-w-0 flex-1 overflow-x-auto overflow-y-auto";
+export const TABLE_SCROLL_CLASS = "app-table-scroll min-h-0 min-w-0 flex-1 overflow-x-auto";
 
 export const TABLE_CLASS = "w-full border-collapse text-left text-sm";
 

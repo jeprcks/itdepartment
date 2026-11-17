@@ -49,15 +49,56 @@ table thead th {
 .page-table tbody td {
   padding-top: 0.75rem;
   padding-bottom: 0.75rem;
-  padding-left: 0.75rem;
-  padding-right: 0.75rem;
 }
 
 @media (min-width: 640px) {
   .page-table tbody td {
     padding-top: 0.875rem;
     padding-bottom: 0.875rem;
-    padding-left: 1.25rem;
-    padding-right: 1.25rem;
+  }
+}
+
+
+/* Short or narrow viewports: let #app-main scroll vertically so tables are not squeezed.
+   Wide and tall desktops keep the fill-height shell with in-card table scrolling.
+   1024x640 avoids locking landscape phones (e.g. 844x390) and short windows (e.g. 1280x600). */
+.app-shell {
+  min-height: 100%;
+  min-width: 0;
+  overflow-x: hidden;
+}
+
+.app-shell .app-table-scroll {
+  flex: 1 1 auto;
+  min-height: auto;
+  overflow-x: auto;
+  overflow-y: visible;
+}
+
+/* Override the table card's Tailwind flex-1 / min-h-0 / overflow-hidden on short or narrow viewports. */
+.app-shell > section {
+  flex: 1 1 auto;
+  min-height: auto;
+  overflow: visible;
+}
+
+@media (min-width: 1024px) and (min-height: 640px) {
+  .app-shell {
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .app-shell > section {
+    flex: 1 1 0%;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .app-shell .app-table-scroll {
+    flex: 1 1 0%;
+    min-height: 0;
+    overflow-x: auto;
+    overflow-y: auto;
   }
 }

@@ -24,7 +24,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} h-full overflow-x-hidden antialiased`}
     >
       <head>
         <link
@@ -32,7 +32,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"
         />
       </head>
-      <body className="flex h-full min-h-full overflow-hidden">
+      <body className="flex h-full min-h-full overflow-x-hidden">
         <SidebarFrame>
           <Suspense
             fallback={
@@ -42,7 +42,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             <Sidebar />
           </Suspense>
         </SidebarFrame>
-        <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden">{children}</div>
+        <div id="app-main" className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-auto">{children}</div>
       </body>
     </html>
   );
